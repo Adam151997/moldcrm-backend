@@ -30,5 +30,6 @@ if not User.objects.filter(email='admin@moldcrm.com').exists():
         role='admin'
     )
     print("✅ Admin user created: admin@moldcrm.com / Admin123!")
+    print("✅ You can now login to the admin panel")
 else:
     print("✅ Admin user already exists")
