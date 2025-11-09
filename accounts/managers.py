@@ -8,4 +8,4 @@ class AccountManager(models.Manager):
         
         if current_account:
             return queryset.filter(account=current_account)
-        return queryset.none()  # Safety: return empty if no account
+        return queryset.none()

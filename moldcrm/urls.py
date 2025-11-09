@@ -4,9 +4,9 @@ from rest_framework import routers
 from api.views import LeadViewSet, ContactViewSet, DealViewSet, DashboardView
 
 router = routers.DefaultRouter()
-router.register(r'leads', LeadViewSet)
-router.register(r'contacts', ContactViewSet)
-router.register(r'deals', DealViewSet)
+router.register(r'leads', LeadViewSet, basename='lead')
+router.register(r'contacts', ContactViewSet, basename='contact')
+router.register(r'deals', DealViewSet, basename='deal')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

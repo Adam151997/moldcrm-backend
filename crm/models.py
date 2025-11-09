@@ -1,6 +1,7 @@
 from django.db import models
 from accounts.models import Account
 from users.models import User
+from accounts.managers import AccountManager
 
 class Lead(models.Model):
     STATUS_CHOICES = [
@@ -24,6 +25,8 @@ class Lead(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    objects = AccountManager()
+    
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
@@ -39,6 +42,8 @@ class Contact(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    objects = AccountManager()
     
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
@@ -64,6 +69,8 @@ class Deal(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_deals')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    objects = AccountManager()
     
     def __str__(self):
         return self.name

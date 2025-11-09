@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from accounts.models import Account
+from accounts.managers import AccountManager
 
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -38,6 +39,8 @@ class User(AbstractUser):
         related_name='custom_user_set',
         related_query_name='user',
     )
+    
+    objects = AccountManager()
     
     def __str__(self):
         return self.email

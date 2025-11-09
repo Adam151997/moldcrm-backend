@@ -1,6 +1,7 @@
 from django.db import models
 from accounts.models import Account
 from users.models import User
+from accounts.managers import AccountManager
 
 class CustomObject(models.Model):
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
@@ -10,6 +11,8 @@ class CustomObject(models.Model):
     icon = models.CharField(max_length=50, default='📄')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    objects = AccountManager()
     
     def __str__(self):
         return self.display_name
@@ -45,6 +48,8 @@ class CustomObjectRecord(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    objects = AccountManager()
     
     def __str__(self):
         return f"{self.custom_object.name} Record #{self.id}"
