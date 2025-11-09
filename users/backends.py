@@ -3,12 +3,18 @@ from django.contrib.auth.backends import ModelBackend
 
 class EmailBackend(ModelBackend):
     def authenticate(self, request, username=None, password=None, **kwargs):
-        UserModel = get_user_model()
-        try:
-            user = UserModel.objects.get(email=username)
-        except UserModel.DoesNotExist:
+        if username is None:
+            username = kwargs.get('email')
+        
+        if username is None or password is None:
             return None
-        else:
-            if user.check_password(password):
-                return user
+            
+        try:
+            # Use _base_manager to bypass AccountManager filtering
+            user = get_user_model()._base_manager.get(email=username)
+        except get_user_model().DoesNotExist:
+            return None
+            
+        if user.check_password(password) and self.user_can_authenticate(user):
+            return user
         return None
