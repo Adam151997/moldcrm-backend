@@ -127,21 +127,3 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
-
-# TEMPORARY AUTO-ADMIN CREATION - WILL RUN ON DEPLOYMENT
-def create_initial_admin():
-    # Only run in production (Railway) and if no admin exists
-    if os.environ.get('RAILWAY_ENVIRONMENT') and not DEBUG:
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        if not User.objects.filter(email='admin@moldcrm.com').exists():
-            User.objects.create_superuser(
-                email='admin@moldcrm.com',
-                password='Admin123!',
-                first_name='Admin',
-                last_name='User'
-            )
-            print("✅ Admin user created automatically!")
-
-# Run the function
-create_initial_admin()
