@@ -1,22 +1,16 @@
 """
-Django settings for moldcrm project - NUCLEAR FIX
+Django settings for moldcrm project - FINAL VERSION
 """
 import os
 import dj_database_url
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-nuclear-fix-key-12345')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-final-fix-67890')
+DEBUG = True
+ALLOWED_HOSTS = ['*']
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True  # FORCE DEBUG MODE
-
-ALLOWED_HOSTS = ['*']  # ALLOW ALL HOSTS
-
-# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -24,13 +18,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third party apps
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
-    
-    # Custom apps
     'accounts',
     'users',
     'crm',
@@ -69,7 +59,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'moldcrm.wsgi.application'
 
-# Database
 DATABASES = {
     'default': dj_database_url.config(
         default='postgresql://postgres:LTUuBazqwpjrYvMRFBRjsnWxzfXhDwsA@maglev.proxy.rlwy.net:40335/railway',
@@ -77,52 +66,37 @@ DATABASES = {
     )
 }
 
-# Password validation
-AUTH_PASSWORD_VALIDATORS = []  # REMOVE VALIDATORS TEMPORARILY
+AUTH_PASSWORD_VALIDATORS = []
 
-# Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Custom user model
 AUTH_USER_MODEL = 'users.User'
 
-# SIMPLIFIED AUTHENTICATION - Use default only
 AUTHENTICATION_BACKENDS = [
+    'users.backends.EmailBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-# Session configuration - SIMPLIFIED
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-SESSION_COOKIE_AGE = 1209600
-
-# REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
 }
 
-# CORS settings
 CORS_ALLOWED_ORIGINS = [
     "https://moldcrm-backend-moldcrm-backend.up.railway.app",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
 ]
 
-# CSRF settings
 CSRF_TRUSTED_ORIGINS = [
     "https://moldcrm-backend-moldcrm-backend.up.railway.app",
 ]
+
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'

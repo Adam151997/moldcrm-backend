@@ -10,7 +10,6 @@ class EmailBackend(ModelBackend):
             return None
             
         try:
-            # Use _base_manager to bypass AccountManager filtering
             user = get_user_model()._base_manager.get(email=username)
         except get_user_model().DoesNotExist:
             return None
