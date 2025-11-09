@@ -20,7 +20,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = ['first_name', 'last_name']  # Remove 'username' from required fields
 
     # Fix the reverse accessor clash
     groups = models.ManyToManyField(
