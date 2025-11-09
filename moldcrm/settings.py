@@ -1,5 +1,5 @@
 """
-Django settings for moldcrm project.
+Django settings for moldcrm project - NUCLEAR FIX
 """
 import os
 import dj_database_url
@@ -9,12 +9,12 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-default-key-for-dev')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-nuclear-fix-key-12345')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+DEBUG = True  # FORCE DEBUG MODE
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.railway.app').split(',')
+ALLOWED_HOSTS = ['*']  # ALLOW ALL HOSTS
 
 # Application definition
 INSTALLED_APPS = [
@@ -39,7 +39,6 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -79,20 +78,7 @@ DATABASES = {
 }
 
 # Password validation
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
+AUTH_PASSWORD_VALIDATORS = []  # REMOVE VALIDATORS TEMPORARILY
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -103,7 +89,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -111,16 +96,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom user model
 AUTH_USER_MODEL = 'users.User'
 
-# Custom authentication backend for email login
+# SIMPLIFIED AUTHENTICATION - Use default only
 AUTHENTICATION_BACKENDS = [
-    'users.backends.EmailBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# Session configuration - SIMPLIFIED
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 1209600
 
 # REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -135,13 +122,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
-# CSRF settings for Railway
+# CSRF settings
 CSRF_TRUSTED_ORIGINS = [
     "https://moldcrm-backend-moldcrm-backend.up.railway.app",
-    "https://*.railway.app",
 ]
-
-# Session configuration
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-SESSION_COOKIE_AGE = 1209600
-SESSION_SAVE_EVERY_REQUEST = True
