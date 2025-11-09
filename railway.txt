@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python manage.py migrate && gunicorn moldcrm.wsgi:application"
+
+[[services]]
+name = "web"
+[[services.ports]]
+port = 8000
