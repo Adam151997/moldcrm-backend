@@ -5,6 +5,12 @@ from django.db.models import Count, Sum, Q
 from crm.models import Lead, Contact, Deal
 from .serializers import LeadSerializer, ContactSerializer, DealSerializer
 
+class UserProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
 class IsAccountUser(permissions.BasePermission):
     def has_permission(self, request, view):
         return hasattr(request, 'account') and request.user.is_authenticated
