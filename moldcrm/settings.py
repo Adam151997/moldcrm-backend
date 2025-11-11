@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'corsheaders',  # KEEP THIS
+    'corsheaders',
     'accounts',
     'users',
     'crm',
@@ -28,9 +28,8 @@ INSTALLED_APPS = [
     'api',
 ]
 
-# 🚨 CRITICAL: ADD CORS MIDDLEWARE AT THE TOP
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # 🚨 ADD THIS - MUST BE FIRST
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -89,7 +88,7 @@ AUTHENTICATION_BACKENDS = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',  # 🚨 CHANGE TO TokenAuthentication
+        'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -97,20 +96,18 @@ REST_FRAMEWORK = {
     ],
 }
 
-# 🚨 CRITICAL: UPDATE CORS SETTINGS
 CORS_ALLOWED_ORIGINS = [
     "https://moldcrm-frontend.vercel.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 
-# 🚨 ADD THESE FOR DEVELOPMENT
-CORS_ALLOW_ALL_ORIGINS = True  # Remove in production
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "https://moldcrm-backend-moldcrm-backend.up.railway.app",
-    "https://moldcrm-frontend.vercel.app",  # 🚨 ADD FRONTEND
+    "https://moldcrm-frontend.vercel.app",
 ]
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
