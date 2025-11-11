@@ -1,5 +1,9 @@
 from rest_framework import permissions
 
+class IsAccountUser(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return hasattr(request, 'account') and request.user.is_authenticated
+
 class IsAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.role == 'admin'
