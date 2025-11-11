@@ -18,7 +18,7 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 class User(AbstractUser):
-    username = None  # Remove username
+    username = None  # Remove username field
     email = models.EmailField(unique=True)
     
     ROLE_CHOICES = [
@@ -34,9 +34,10 @@ class User(AbstractUser):
     
     # Email-based authentication
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []  # Remove 'username' from required fields
+    REQUIRED_FIELDS = []  # Remove username from required fields
     
     objects = UserManager()
 
     def __str__(self):
         return self.email
+        
