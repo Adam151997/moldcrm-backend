@@ -18,7 +18,7 @@ class IsAccountUser(permissions.BasePermission):
 class LeadViewSet(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Lead.objects.all()  # Add this line
+    queryset = Lead.objects.all() 
     
     def get_queryset(self):
         return Lead.objects.filter(account=self.request.account)
@@ -29,7 +29,7 @@ class LeadViewSet(viewsets.ModelViewSet):
 class ContactViewSet(viewsets.ModelViewSet):
     serializer_class = ContactSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Contact.objects.all()  # Add this line
+    queryset = Contact.objects.all() 
     
     def get_queryset(self):
         return Contact.objects.filter(account=self.request.account)
@@ -40,7 +40,7 @@ class ContactViewSet(viewsets.ModelViewSet):
 class DealViewSet(viewsets.ModelViewSet):
     serializer_class = DealSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Deal.objects.all()  # Add this line
+    queryset = Deal.objects.all()  
     
     def get_queryset(self):
         return Deal.objects.filter(account=self.request.account)
