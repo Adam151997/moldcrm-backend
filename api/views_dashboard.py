@@ -1,7 +1,10 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import permissions  
 from django.db.models import Count, Sum, Q
 from crm.models import Lead, Contact, Deal
+from api.permissions import IsAccountUser 
+from api.serializers import LeadSerializer, DealSerializer
 
 class DashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
