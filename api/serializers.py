@@ -2,6 +2,12 @@ from rest_framework import serializers
 from crm.models import Lead, Contact, Deal
 from users.models import User
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'phone', 'department', 'account']
+        read_only_fields = ['id', 'email', 'account']
+
 class LeadSerializer(serializers.ModelSerializer):
     assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
     

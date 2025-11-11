@@ -16,6 +16,7 @@ urlpatterns = [
     path('', redirect_to_admin),
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+    path('api/', include('api.urls')),
     path('api/dashboard/', DashboardView.as_view(), name='dashboard'),
     path('api-auth/', include('rest_framework.urls')),
 ]

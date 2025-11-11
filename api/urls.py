@@ -2,10 +2,11 @@ from django.urls import path, include
 from rest_framework.authtoken import views
 from . import views as api_views
 from .views_dashboard import DashboardView
+from .views_auth import CustomAuthToken  # ADD THIS IMPORT
 
 urlpatterns = [
-    # Authentication
-    path('auth/login/', views.obtain_auth_token, name='login'),
+    # Authentication - USE CUSTOM AUTH
+    path('auth/login/', CustomAuthToken.as_view(), name='login'),
     
     # User endpoints
     path('users/profile/', api_views.UserProfileView.as_view(), name='user-profile'),

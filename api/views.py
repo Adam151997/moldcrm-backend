@@ -3,16 +3,25 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Count, Sum, Q
 from crm.models import Lead, Contact, Deal
-from .serializers import LeadSerializer, ContactSerializer, DealSerializer
+from .serializers import LeadSerializer, ContactSerializer, DealSerializer, UserSerializer
 
+# MOVE IsAccountUser to TOP - define it BEFORE using it
 class IsAccountUser(permissions.BasePermission):
     def has_permission(self, request, view):
         return hasattr(request, 'account') and request.user.is_authenticated
 
+# NOW UserProfileView can use IsAccountUser
+class UserProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+    
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
 class LeadViewSet(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Lead.objects.all()  # Add this line
+    queryset = Lead.objects.all() 
     
     def get_queryset(self):
         return Lead.objects.filter(account=self.request.account)
@@ -23,7 +32,7 @@ class LeadViewSet(viewsets.ModelViewSet):
 class ContactViewSet(viewsets.ModelViewSet):
     serializer_class = ContactSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Contact.objects.all()  # Add this line
+    queryset = Contact.objects.all() 
     
     def get_queryset(self):
         return Contact.objects.filter(account=self.request.account)
@@ -34,7 +43,7 @@ class ContactViewSet(viewsets.ModelViewSet):
 class DealViewSet(viewsets.ModelViewSet):
     serializer_class = DealSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Deal.objects.all()  # Add this line
+    queryset = Deal.objects.all()  
     
     def get_queryset(self):
         return Deal.objects.filter(account=self.request.account)
