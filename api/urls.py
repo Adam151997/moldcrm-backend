@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.authtoken import views
 from . import views as api_views
+from .views_activities import ActivityViewSet, NoteViewSet
 from .views_auth import CustomAuthToken
 
 urlpatterns = [
@@ -23,6 +24,16 @@ urlpatterns = [
     path('deals/<int:pk>/', api_views.DealViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='deals-detail'),
     path('deals/<int:pk>/update_stage/', api_views.DealViewSet.as_view({'patch': 'update_stage'}), name='deal-update-stage'),
     path('deals/pipeline_analytics/', api_views.DealViewSet.as_view({'get': 'pipeline_analytics'}), name='pipeline-analytics'),
+    
+    # Activities & Notes endpoints
+    path('activities/', ActivityViewSet.as_view({'get': 'list', 'post': 'create'}), name='activities-list'),
+    path('activities/<int:pk>/', ActivityViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='activities-detail'),
+    path('activities/<int:pk>/mark_completed/', ActivityViewSet.as_view({'patch': 'mark_completed'}), name='activity-mark-completed'),
+    path('activities/recent/', ActivityViewSet.as_view({'get': 'recent'}), name='activities-recent'),
+    
+    path('notes/', NoteViewSet.as_view({'get': 'list', 'post': 'create'}), name='notes-list'),
+    path('notes/<int:pk>/', NoteViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='notes-detail'),
+    path('notes/recent/', NoteViewSet.as_view({'get': 'recent'}), name='notes-recent'),
     
     # Dashboard
     path('dashboard/', api_views.DashboardView.as_view(), name='dashboard'),
