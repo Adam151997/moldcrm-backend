@@ -4,11 +4,15 @@ from users.models import User
 
 class UserSerializer(serializers.ModelSerializer):
     account_name = serializers.CharField(source='account.name', read_only=True)
+    account_id = serializers.IntegerField(source='account.id', read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'phone', 'department', 'account', 'account_name']
-        read_only_fields = ['id', 'email', 'account']
+        fields = [
+            'id', 'email', 'first_name', 'last_name', 'role', 
+            'phone', 'department', 'account_id', 'account_name'
+        ]
+        read_only_fields = ['id', 'email', 'account_id', 'account_name']
 
 class LeadSerializer(serializers.ModelSerializer):
     assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
