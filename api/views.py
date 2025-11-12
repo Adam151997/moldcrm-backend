@@ -1,16 +1,15 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from django.db.models import Count, Sum, Q
 from crm.models import Lead, Contact, Deal
 from .serializers import LeadSerializer, ContactSerializer, DealSerializer, UserSerializer
 
-# MOVE IsAccountUser to TOP - define it BEFORE using it
 class IsAccountUser(permissions.BasePermission):
     def has_permission(self, request, view):
-        return hasattr(request, 'account') and request.user.is_authenticated
+        return request.user.is_authenticated and hasattr(request.user, 'account')
 
-# NOW UserProfileView can use IsAccountUser
 class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
     
@@ -21,41 +20,65 @@ class UserProfileView(APIView):
 class LeadViewSet(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Lead.objects.all() 
     
     def get_queryset(self):
-        return Lead.objects.filter(account=self.request.account)
+        return Lead.objects.filter(account=self.request.user.account)
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, account=self.request.account)
+        serializer.save(created_by=self.request.user, account=self.request.user.account)
 
 class ContactViewSet(viewsets.ModelViewSet):
     serializer_class = ContactSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Contact.objects.all() 
     
     def get_queryset(self):
-        return Contact.objects.filter(account=self.request.account)
+        return Contact.objects.filter(account=self.request.user.account)
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, account=self.request.account)
+        serializer.save(created_by=self.request.user, account=self.request.user.account)
+    
+    @action(detail=False, methods=['post'])
+    def convert_from_lead(self, request):
+        lead_id = request.data.get('lead_id')
+        try:
+            lead = Lead.objects.get(id=lead_id, account=request.user.account)
+            contact = Contact.objects.create(
+                first_name=lead.first_name,
+                last_name=lead.last_name,
+                email=lead.email,
+                phone=lead.phone or '',
+                company=lead.company or '',
+                lead=lead,
+                account=request.user.account,
+                created_by=request.user
+            )
+            # Update lead status
+            lead.status = 'converted'
+            lead.save()
+            
+            serializer = ContactSerializer(contact)
+            return Response(serializer.data)
+        except Lead.DoesNotExist:
+            return Response(
+                {"error": "Lead not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class DealViewSet(viewsets.ModelViewSet):
     serializer_class = DealSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-    queryset = Deal.objects.all()  
     
     def get_queryset(self):
-        return Deal.objects.filter(account=self.request.account)
+        return Deal.objects.filter(account=self.request.user.account)
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, account=self.request.account)
+        serializer.save(created_by=self.request.user, account=self.request.user.account)
 
 class DashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
     
     def get(self, request):
-        account = request.account
+        account = request.user.account
         
         # Lead statistics
         lead_stats = Lead.objects.filter(account=account).aggregate(
