@@ -1,5 +1,4 @@
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
 from accounts.models import Account
 from users.models import User
 
@@ -20,7 +19,7 @@ class Lead(models.Model):
     company = models.CharField(max_length=100, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
     source = models.CharField(max_length=100, blank=True)
-    notes = models.TextField(blank=True)  # PRODUCTION: 'notes' NOT 'notes_text'
+    notes = models.TextField(blank=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_leads')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -62,7 +61,6 @@ class Deal(models.Model):
     stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default='prospect')
     expected_close_date = models.DateField(null=True, blank=True)
     probability = models.IntegerField(default=0)
-    notes = models.TextField(blank=True)  # PRODUCTION: 'notes' NOT 'notes_text'
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_deals')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -70,7 +68,7 @@ class Deal(models.Model):
     def __str__(self):
         return self.name
 
-# NEW MODELS - DON'T EXIST IN PRODUCTION YET (NO MIGRATIONS NEEDED)
+# NEW MODELS - FOR FUTURE USE (NO MIGRATIONS NEEDED)
 class Activity(models.Model):
     ACTIVITY_TYPES = [
         ('call', 'Phone Call'),
@@ -97,9 +95,6 @@ class Activity(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    class Meta:
-        ordering = ['-created_at']
-    
     def __str__(self):
         return f"{self.get_activity_type_display()}: {self.title}"
 
@@ -114,9 +109,6 @@ class Note(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['-created_at']
     
     def __str__(self):
         return f"Note by {self.created_by.get_full_name()} on {self.created_at.date()}"

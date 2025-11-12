@@ -52,7 +52,6 @@ class ContactViewSet(viewsets.ModelViewSet):
                 account=request.user.account,
                 created_by=request.user
             )
-            # Update lead status
             lead.status = 'converted'
             lead.save()
             
@@ -102,20 +101,17 @@ class DealViewSet(viewsets.ModelViewSet):
     def pipeline_analytics(self, request):
         account = request.user.account
         
-        # Stage counts
         stage_counts = Deal.objects.filter(account=account).values('stage').annotate(
             count=Count('id'),
             total_amount=Sum('amount')
         )
         
-        # Win rate calculation
         total_deals = Deal.objects.filter(account=account).count()
         won_deals = Deal.objects.filter(account=account, stage='closed_won').count()
         lost_deals = Deal.objects.filter(account=account, stage='closed_lost').count()
         
         win_rate = (won_deals / (won_deals + lost_deals)) * 100 if (won_deals + lost_deals) > 0 else 0
         
-        # Pipeline value by stage
         pipeline_value = Deal.objects.filter(
             account=account, 
             stage__in=['prospect', 'qualification', 'proposal', 'negotiation']
@@ -136,7 +132,6 @@ class DashboardView(APIView):
     def get(self, request):
         account = request.user.account
         
-        # Lead statistics
         lead_stats = Lead.objects.filter(account=account).aggregate(
             total=Count('id'),
             new=Count('id', filter=Q(status='new')),
@@ -144,14 +139,12 @@ class DashboardView(APIView):
             qualified=Count('id', filter=Q(status='qualified'))
         )
         
-        # Deal pipeline
         deal_stats = Deal.objects.filter(account=account).aggregate(
             total_amount=Sum('amount'),
             won_amount=Sum('amount', filter=Q(stage='closed_won')),
             open_deals=Count('id', filter=~Q(stage__in=['closed_won', 'closed_lost']))
         )
         
-        # Recent activity
         recent_leads = Lead.objects.filter(account=account).order_by('-created_at')[:5]
         recent_deals = Deal.objects.filter(account=account).order_by('-created_at')[:5]
         
