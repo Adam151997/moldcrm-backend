@@ -52,6 +52,7 @@ class ContactViewSet(viewsets.ModelViewSet):
                 account=request.user.account,
                 created_by=request.user
             )
+            # Update lead status
             lead.status = 'converted'
             lead.save()
             
@@ -72,59 +73,6 @@ class DealViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user, account=self.request.user.account)
-    
-    @action(detail=True, methods=['patch'])
-    def update_stage(self, request, pk=None):
-        try:
-            deal = self.get_object()
-            new_stage = request.data.get('stage')
-            
-            if new_stage not in dict(Deal.STAGE_CHOICES):
-                return Response(
-                    {'error': 'Invalid stage'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            deal.stage = new_stage
-            deal.save()
-            
-            serializer = self.get_serializer(deal)
-            return Response(serializer.data)
-            
-        except Deal.DoesNotExist:
-            return Response(
-                {'error': 'Deal not found'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
-    
-    @action(detail=False, methods=['get'])
-    def pipeline_analytics(self, request):
-        account = request.user.account
-        
-        stage_counts = Deal.objects.filter(account=account).values('stage').annotate(
-            count=Count('id'),
-            total_amount=Sum('amount')
-        )
-        
-        total_deals = Deal.objects.filter(account=account).count()
-        won_deals = Deal.objects.filter(account=account, stage='closed_won').count()
-        lost_deals = Deal.objects.filter(account=account, stage='closed_lost').count()
-        
-        win_rate = (won_deals / (won_deals + lost_deals)) * 100 if (won_deals + lost_deals) > 0 else 0
-        
-        pipeline_value = Deal.objects.filter(
-            account=account, 
-            stage__in=['prospect', 'qualification', 'proposal', 'negotiation']
-        ).aggregate(total=Sum('amount'))['total'] or 0
-        
-        return Response({
-            'stage_counts': list(stage_counts),
-            'win_rate': round(win_rate, 2),
-            'pipeline_value': float(pipeline_value) if pipeline_value else 0,
-            'total_deals': total_deals,
-            'won_deals': won_deals,
-            'lost_deals': lost_deals,
-        })
 
 class DashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
@@ -132,6 +80,7 @@ class DashboardView(APIView):
     def get(self, request):
         account = request.user.account
         
+        # Lead statistics
         lead_stats = Lead.objects.filter(account=account).aggregate(
             total=Count('id'),
             new=Count('id', filter=Q(status='new')),
@@ -139,12 +88,14 @@ class DashboardView(APIView):
             qualified=Count('id', filter=Q(status='qualified'))
         )
         
+        # Deal pipeline
         deal_stats = Deal.objects.filter(account=account).aggregate(
             total_amount=Sum('amount'),
             won_amount=Sum('amount', filter=Q(stage='closed_won')),
             open_deals=Count('id', filter=~Q(stage__in=['closed_won', 'closed_lost']))
         )
         
+        # Recent activity
         recent_leads = Lead.objects.filter(account=account).order_by('-created_at')[:5]
         recent_deals = Deal.objects.filter(account=account).order_by('-created_at')[:5]
         
