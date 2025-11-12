@@ -3,6 +3,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework import status
 from users.models import User
+from .serializers import UserSerializer  # ADD THIS IMPORT
 
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
@@ -26,13 +27,13 @@ class CustomAuthToken(ObtainAuthToken):
             
             if user.check_password(password):
                 token, created = Token.objects.get_or_create(user=user)
+                
+                # Use the serializer to get proper user data including account
+                user_data = UserSerializer(user).data
+                
                 return Response({
                     'token': token.key,
-                    'user_id': user.pk,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'role': user.role
+                    'user': user_data  # RETURN FULL USER OBJECT
                 })
             else:
                 return Response(
