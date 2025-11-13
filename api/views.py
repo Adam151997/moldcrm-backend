@@ -3,8 +3,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db.models import Count, Sum, Q
-from crm.models import Lead, Contact, Deal
-from .serializers import LeadSerializer, ContactSerializer, DealSerializer, UserSerializer
+from django.db import transaction
+from crm.models import Lead, Contact, Deal, PipelineStage
+from custom_objects.models import CustomObject, CustomField, CustomObjectRecord
+from .serializers import (
+    LeadSerializer, ContactSerializer, DealSerializer, UserSerializer,
+    PipelineStageSerializer, CustomFieldSerializer, CustomObjectSerializer,
+    CustomObjectRecordSerializer
+)
 
 class IsAccountUser(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -161,3 +167,104 @@ class DashboardView(APIView):
             'recent_leads': LeadSerializer(recent_leads, many=True).data,
             'recent_deals': DealSerializer(recent_deals, many=True).data,
         })
+
+class PipelineStageViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing custom pipeline stages"""
+    serializer_class = PipelineStageSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        return PipelineStage.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        # Auto-increment order if not provided
+        account = self.request.user.account
+        max_order = PipelineStage.objects.filter(account=account).count()
+        serializer.save(account=account, order=max_order)
+
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        """Reorder pipeline stages based on provided order"""
+        stages_order = request.data.get('stages', [])  # Expected format: [{'id': 1, 'order': 0}, {'id': 2, 'order': 1}, ...]
+
+        try:
+            with transaction.atomic():
+                for stage_data in stages_order:
+                    stage_id = stage_data.get('id')
+                    new_order = stage_data.get('order')
+
+                    stage = PipelineStage.objects.get(
+                        id=stage_id,
+                        account=request.user.account
+                    )
+                    stage.order = new_order
+                    stage.save()
+
+            return Response({'status': 'success', 'message': 'Stages reordered successfully'})
+        except PipelineStage.DoesNotExist:
+            return Response(
+                {'error': 'One or more stages not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class CustomFieldViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing custom fields"""
+    serializer_class = CustomFieldSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        queryset = CustomField.objects.filter(account=self.request.user.account)
+
+        # Filter by entity_type if provided
+        entity_type = self.request.query_params.get('entity_type', None)
+        if entity_type:
+            queryset = queryset.filter(entity_type=entity_type)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        # Auto-increment order if not provided
+        account = self.request.user.account
+        entity_type = serializer.validated_data.get('entity_type', 'custom')
+        max_order = CustomField.objects.filter(
+            account=account,
+            entity_type=entity_type
+        ).count()
+        serializer.save(account=account, order=max_order)
+
+class CustomObjectViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing custom objects"""
+    serializer_class = CustomObjectSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        return CustomObject.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )
+
+class CustomObjectRecordViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing custom object records"""
+    serializer_class = CustomObjectRecordSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        queryset = CustomObjectRecord.objects.filter(custom_object__account=self.request.user.account)
+
+        # Filter by custom_object if provided
+        custom_object_id = self.request.query_params.get('custom_object', None)
+        if custom_object_id:
+            queryset = queryset.filter(custom_object_id=custom_object_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
