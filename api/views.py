@@ -84,23 +84,54 @@ class DealViewSet(viewsets.ModelViewSet):
     def update_stage(self, request, pk=None):
         try:
             deal = self.get_object()
+
+            # Support both legacy stage names and custom pipeline stage IDs
             new_stage = request.data.get('stage')
-            
-            if new_stage not in dict(Deal.STAGE_CHOICES):
+            pipeline_stage_id = request.data.get('pipeline_stage')
+
+            if pipeline_stage_id:
+                # Using custom pipeline stages
+                try:
+                    pipeline_stage = PipelineStage.objects.get(
+                        id=pipeline_stage_id,
+                        account=request.user.account
+                    )
+                    deal.pipeline_stage = pipeline_stage
+                    # Update legacy stage field based on pipeline stage properties
+                    if pipeline_stage.is_closed and pipeline_stage.is_won:
+                        deal.stage = 'closed_won'
+                    elif pipeline_stage.is_closed and not pipeline_stage.is_won:
+                        deal.stage = 'closed_lost'
+                    else:
+                        deal.stage = 'prospect'  # Default for open stages
+                except PipelineStage.DoesNotExist:
+                    return Response(
+                        {'error': 'Pipeline stage not found'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            elif new_stage:
+                # Using legacy stage names (for backward compatibility)
+                if new_stage not in dict(Deal.STAGE_CHOICES):
+                    return Response(
+                        {'error': 'Invalid stage'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                deal.stage = new_stage
+                deal.pipeline_stage = None
+            else:
                 return Response(
-                    {'error': 'Invalid stage'}, 
+                    {'error': 'Either stage or pipeline_stage must be provided'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
-            deal.stage = new_stage
+
             deal.save()
-            
+
             serializer = self.get_serializer(deal)
             return Response(serializer.data)
-            
+
         except Deal.DoesNotExist:
             return Response(
-                {'error': 'Deal not found'}, 
+                {'error': 'Deal not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
     

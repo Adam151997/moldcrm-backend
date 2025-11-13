@@ -80,7 +80,8 @@ class Deal(models.Model):
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='deals')
     assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default='prospect')
+    stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default='prospect')  # Legacy field - kept for backward compatibility
+    pipeline_stage = models.ForeignKey(PipelineStage, on_delete=models.SET_NULL, null=True, blank=True, related_name='deals')  # New custom pipeline stage
     expected_close_date = models.DateField(null=True, blank=True)
     probability = models.IntegerField(default=0)
     custom_data = models.JSONField(default=dict, blank=True)  # For custom field data
