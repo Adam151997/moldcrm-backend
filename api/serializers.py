@@ -42,6 +42,7 @@ class ContactSerializer(serializers.ModelSerializer):
 class DealSerializer(serializers.ModelSerializer):
     contact_name = serializers.CharField(source='contact.__str__', read_only=True)
     assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
+    pipeline_stage_name = serializers.CharField(source='pipeline_stage.display_name', read_only=True, allow_null=True)
 
     class Meta:
         model = Deal
@@ -57,9 +58,9 @@ class PipelineStageSerializer(serializers.ModelSerializer):
 class CustomFieldSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomField
-        fields = ['id', 'custom_object', 'entity_type', 'name', 'display_name', 'field_type',
+        fields = ['id', 'account', 'custom_object', 'entity_type', 'name', 'display_name', 'field_type',
                   'required', 'default_value', 'options', 'order', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['account', 'created_at', 'updated_at']
 
 class CustomObjectSerializer(serializers.ModelSerializer):
     fields = CustomFieldSerializer(many=True, read_only=True)
