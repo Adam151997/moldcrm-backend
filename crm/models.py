@@ -39,6 +39,7 @@ class Lead(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
     source = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
+    custom_data = models.JSONField(default=dict, blank=True)  # For custom field data
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_leads')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -55,6 +56,8 @@ class Contact(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     company = models.CharField(max_length=100, blank=True)
     title = models.CharField(max_length=100, blank=True)
+    department = models.CharField(max_length=100, blank=True)  # For department/division
+    custom_data = models.JSONField(default=dict, blank=True)  # For custom field data
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
