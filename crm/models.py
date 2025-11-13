@@ -2,6 +2,25 @@ from django.db import models
 from accounts.models import Account
 from users.models import User
 
+class PipelineStage(models.Model):
+    """Custom pipeline stages for deals"""
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='pipeline_stages')
+    name = models.CharField(max_length=100)  # Internal name (e.g., 'prospect')
+    display_name = models.CharField(max_length=100)  # Display name (e.g., 'Prospect')
+    color = models.CharField(max_length=20, default='blue')  # Color for UI (e.g., 'blue', 'green')
+    is_closed = models.BooleanField(default=False)  # Whether this stage is a closed stage
+    is_won = models.BooleanField(default=False)  # Whether this is a won stage (only for closed stages)
+    order = models.IntegerField(default=0)  # Order in the pipeline
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order']
+        unique_together = ['account', 'name']
+
+    def __str__(self):
+        return f"{self.display_name} ({self.account.name})"
+
 class Lead(models.Model):
     STATUS_CHOICES = [
         ('new', 'New'),
@@ -52,7 +71,7 @@ class Deal(models.Model):
         ('closed_won', 'Closed Won'),
         ('closed_lost', 'Closed Lost'),
     ]
-    
+
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
     name = models.CharField(max_length=200)
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE, related_name='deals')
@@ -61,10 +80,11 @@ class Deal(models.Model):
     stage = models.CharField(max_length=20, choices=STAGE_CHOICES, default='prospect')
     expected_close_date = models.DateField(null=True, blank=True)
     probability = models.IntegerField(default=0)
+    custom_data = models.JSONField(default=dict, blank=True)  # For custom field data
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_deals')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     def __str__(self):
         return self.name
 

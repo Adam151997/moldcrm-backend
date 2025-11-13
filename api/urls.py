@@ -26,4 +26,21 @@ urlpatterns = [
     
     # Dashboard
     path('dashboard/', api_views.DashboardView.as_view(), name='dashboard'),
+
+    # Pipeline Stages
+    path('pipeline-stages/', api_views.PipelineStageViewSet.as_view({'get': 'list', 'post': 'create'}), name='pipeline-stages-list'),
+    path('pipeline-stages/<int:pk>/', api_views.PipelineStageViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='pipeline-stages-detail'),
+    path('pipeline-stages/reorder/', api_views.PipelineStageViewSet.as_view({'post': 'reorder'}), name='pipeline-stages-reorder'),
+
+    # Custom Fields
+    path('custom-fields/', api_views.CustomFieldViewSet.as_view({'get': 'list', 'post': 'create'}), name='custom-fields-list'),
+    path('custom-fields/<int:pk>/', api_views.CustomFieldViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='custom-fields-detail'),
+
+    # Custom Objects
+    path('custom-objects/', api_views.CustomObjectViewSet.as_view({'get': 'list', 'post': 'create'}), name='custom-objects-list'),
+    path('custom-objects/<int:pk>/', api_views.CustomObjectViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='custom-objects-detail'),
+
+    # Custom Object Records
+    path('custom-object-records/', api_views.CustomObjectRecordViewSet.as_view({'get': 'list', 'post': 'create'}), name='custom-object-records-list'),
+    path('custom-object-records/<int:pk>/', api_views.CustomObjectRecordViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='custom-object-records-detail'),
 ]
