@@ -7,3 +7,15 @@ gunicorn==21.2.0
 dj-database-url==1.2.0
 django-filter==23.3
 whitenoise==6.4.0
+
+# AI Integration
+google-generativeai==0.3.2
+
+# Email & Communications
+sendgrid==6.11.0
+celery==5.3.4
+redis==5.0.1
+
+# Webhooks & Integrations
+requests==2.31.0
+cryptography==41.0.7

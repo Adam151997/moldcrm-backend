@@ -26,6 +26,9 @@ INSTALLED_APPS = [
     'crm',
     'custom_objects',
     'api',
+    'templates',
+    'automation',
+    'integrations',
 ]
 
 MIDDLEWARE = [
@@ -111,3 +114,18 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# Gemini AI Configuration
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyDh5utXAp2887iHPCaAzyJ0JHAfxZPJTeA')
+
+# Email Configuration (SendGrid)
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@moldcrm.com')
+
+# Celery Configuration (for async tasks)
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+
+# Webhook Configuration
+WEBHOOK_TIMEOUT = 10  # seconds
+WEBHOOK_MAX_RETRIES = 3
