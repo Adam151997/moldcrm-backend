@@ -89,6 +89,11 @@ class DealViewSet(viewsets.ModelViewSet):
             new_stage = request.data.get('stage')
             pipeline_stage_id = request.data.get('pipeline_stage')
 
+            # Log request data for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"update_stage called with data: {request.data}")
+
             if pipeline_stage_id:
                 # Using custom pipeline stages
                 try:
@@ -120,7 +125,7 @@ class DealViewSet(viewsets.ModelViewSet):
                 deal.pipeline_stage = None
             else:
                 return Response(
-                    {'error': 'Either stage or pipeline_stage must be provided'},
+                    {'error': 'Either stage or pipeline_stage must be provided', 'received_data': request.data},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -267,6 +272,21 @@ class CustomFieldViewSet(viewsets.ModelViewSet):
             entity_type=entity_type
         ).count()
         serializer.save(account=account, order=max_order)
+
+    def create(self, request, *args, **kwargs):
+        # Log request data for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"CustomField create called with data: {request.data}")
+
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            logger.error(f"CustomField validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 class CustomObjectViewSet(viewsets.ModelViewSet):
     """ViewSet for managing custom objects"""
