@@ -8,7 +8,7 @@ from django.db import connection
 
 
 class Command(BaseCommand):
-    help = 'Manually add missing custom_data columns to Lead and Contact tables'
+    help = 'Manually add missing custom_data columns to Lead, Contact, and Deal tables'
 
     def handle(self, *args, **options):
         self.stdout.write('Checking and adding missing custom_data columns...\n')
