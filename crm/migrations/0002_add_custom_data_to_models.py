@@ -25,4 +25,9 @@ class Migration(migrations.Migration):
             name='department',
             field=models.CharField(blank=True, max_length=100),
         ),
+        migrations.AddField(
+            model_name='deal',
+            name='custom_data',
+            field=models.JSONField(blank=True, default=dict),
+        ),
     ]
