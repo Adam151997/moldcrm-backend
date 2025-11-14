@@ -319,3 +319,267 @@ class CustomObjectRecordViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+# ========================================
+# Business Templates ViewSets
+# ========================================
+
+class BusinessTemplateViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for browsing available business templates"""
+    from .serializers import BusinessTemplateSerializer
+    serializer_class = BusinessTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from templates.models import BusinessTemplate
+        return BusinessTemplate.objects.filter(is_active=True)
+
+    @action(detail=True, methods=['post'])
+    def apply(self, request, pk=None):
+        """Apply a template to the user's account"""
+        from templates.models import BusinessTemplate, AppliedTemplate
+        from crm.models import PipelineStage
+        from custom_objects.models import CustomField
+        
+        template = self.get_object()
+        account = request.user.account
+        
+        # Create applied template record
+        applied_template = AppliedTemplate.objects.create(
+            account=account,
+            template=template,
+            applied_by=request.user
+        )
+        
+        # Apply pipeline stages
+        for stage_config in template.pipeline_stages:
+            PipelineStage.objects.get_or_create(
+                account=account,
+                name=stage_config['name'],
+                defaults={
+                    'display_name': stage_config['display_name'],
+                    'color': stage_config.get('color', '#3B82F6'),
+                    'is_closed': stage_config.get('is_closed', False),
+                    'is_won': stage_config.get('is_won', False),
+                    'order': stage_config.get('order', 0),
+                }
+            )
+        
+        # Apply custom fields
+        for field_config in template.custom_fields:
+            CustomField.objects.get_or_create(
+                account=account,
+                name=field_config['name'],
+                entity_type=field_config.get('entity_type', 'deal'),
+                defaults={
+                    'display_name': field_config['display_name'],
+                    'field_type': field_config['field_type'],
+                    'required': field_config.get('required', False),
+                    'default_value': field_config.get('default_value', ''),
+                    'options': field_config.get('options'),
+                    'order': field_config.get('order', 0),
+                }
+            )
+        
+        from .serializers import AppliedTemplateSerializer
+        serializer = AppliedTemplateSerializer(applied_template)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AppliedTemplateViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing applied templates"""
+    from .serializers import AppliedTemplateSerializer
+    serializer_class = AppliedTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from templates.models import AppliedTemplate
+        return AppliedTemplate.objects.filter(account=self.request.user.account)
+
+
+# ========================================
+# Automation ViewSets
+# ========================================
+
+class WorkflowViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing workflows"""
+    from .serializers import WorkflowSerializer
+    serializer_class = WorkflowSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from automation.models import Workflow
+        return Workflow.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )
+
+
+class AIInsightViewSet(viewsets.ModelViewSet):
+    """ViewSet for AI insights"""
+    from .serializers import AIInsightSerializer
+    serializer_class = AIInsightSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from automation.models import AIInsight
+        return AIInsight.objects.filter(account=self.request.user.account)
+
+    @action(detail=False, methods=['post'])
+    def generate_lead_score(self, request):
+        """Generate AI lead score"""
+        from automation.services import GeminiAIService
+        from automation.models import AIInsight
+        from crm.models import Lead
+        
+        lead_id = request.data.get('lead_id')
+        try:
+            lead = Lead.objects.get(id=lead_id, account=request.user.account)
+            lead_data = {
+                'first_name': lead.first_name,
+                'last_name': lead.last_name,
+                'company': lead.company,
+                'status': lead.status,
+                'source': lead.source,
+                'notes': lead.notes,
+            }
+            
+            ai_service = GeminiAIService()
+            result = ai_service.generate_lead_score(lead_data)
+            
+            # Create insight record
+            insight = AIInsight.objects.create(
+                account=request.user.account,
+                lead=lead,
+                insight_type='lead_score',
+                title=f"Lead Score: {result.get('score', 0)}/100",
+                content=result.get('reasoning', ''),
+                confidence_score=result.get('score', 0) / 100,
+                metadata={'recommendations': result.get('recommendations', [])}
+            )
+            
+            from .serializers import AIInsightSerializer
+            serializer = AIInsightSerializer(insight)
+            return Response(serializer.data)
+        except Lead.DoesNotExist:
+            return Response({'error': 'Lead not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def generate_deal_prediction(self, request):
+        """Generate AI deal prediction"""
+        from automation.services import GeminiAIService
+        from automation.models import AIInsight
+        from crm.models import Deal
+        
+        deal_id = request.data.get('deal_id')
+        try:
+            deal = Deal.objects.get(id=deal_id, account=request.user.account)
+            deal_data = {
+                'name': deal.name,
+                'amount': str(deal.amount) if deal.amount else '0',
+                'stage': deal.stage,
+                'expected_close_date': str(deal.expected_close_date) if deal.expected_close_date else None,
+                'probability': deal.probability,
+                'contact_name': deal.contact.__str__() if deal.contact else 'Unknown',
+            }
+            
+            ai_service = GeminiAIService()
+            result = ai_service.predict_deal_outcome(deal_data)
+            
+            # Create insight record
+            insight = AIInsight.objects.create(
+                account=request.user.account,
+                deal=deal,
+                insight_type='deal_prediction',
+                title=f"Deal Prediction: {result.get('probability', 0)}% likely to close",
+                content=f"Predicted close: {result.get('predicted_close_date', 'uncertain')}",
+                confidence_score=result.get('probability', 0) / 100,
+                metadata={
+                    'insights': result.get('insights', []),
+                    'risk_factors': result.get('risk_factors', [])
+                }
+            )
+            
+            from .serializers import AIInsightSerializer
+            serializer = AIInsightSerializer(insight)
+            return Response(serializer.data)
+        except Deal.DoesNotExist:
+            return Response({'error': 'Deal not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ========================================
+# Email & Integration ViewSets
+# ========================================
+
+class EmailTemplateViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing email templates"""
+    from .serializers import EmailTemplateSerializer
+    serializer_class = EmailTemplateSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import EmailTemplate
+        return EmailTemplate.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )
+
+
+class EmailCampaignViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing email campaigns"""
+    from .serializers import EmailCampaignSerializer
+    serializer_class = EmailCampaignSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import EmailCampaign
+        return EmailCampaign.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )
+
+
+class WebhookViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing webhooks"""
+    from .serializers import WebhookSerializer
+    serializer_class = WebhookSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import Webhook
+        return Webhook.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )
+
+
+class ExternalIntegrationViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing external integrations"""
+    from .serializers import ExternalIntegrationSerializer
+    serializer_class = ExternalIntegrationSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import ExternalIntegration
+        return ExternalIntegration.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )

@@ -43,4 +43,34 @@ urlpatterns = [
     # Custom Object Records
     path('custom-object-records/', api_views.CustomObjectRecordViewSet.as_view({'get': 'list', 'post': 'create'}), name='custom-object-records-list'),
     path('custom-object-records/<int:pk>/', api_views.CustomObjectRecordViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='custom-object-records-detail'),
+
+    # Business Templates
+    path('templates/', api_views.BusinessTemplateViewSet.as_view({'get': 'list'}), name='templates-list'),
+    path('templates/<int:pk>/', api_views.BusinessTemplateViewSet.as_view({'get': 'retrieve'}), name='templates-detail'),
+    path('templates/<int:pk>/apply/', api_views.BusinessTemplateViewSet.as_view({'post': 'apply'}), name='templates-apply'),
+    path('applied-templates/', api_views.AppliedTemplateViewSet.as_view({'get': 'list'}), name='applied-templates-list'),
+
+    # Workflows & Automation
+    path('workflows/', api_views.WorkflowViewSet.as_view({'get': 'list', 'post': 'create'}), name='workflows-list'),
+    path('workflows/<int:pk>/', api_views.WorkflowViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='workflows-detail'),
+
+    # AI Insights
+    path('ai-insights/', api_views.AIInsightViewSet.as_view({'get': 'list'}), name='ai-insights-list'),
+    path('ai-insights/<int:pk>/', api_views.AIInsightViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'delete': 'destroy'}), name='ai-insights-detail'),
+    path('ai-insights/generate-lead-score/', api_views.AIInsightViewSet.as_view({'post': 'generate_lead_score'}), name='ai-insights-lead-score'),
+    path('ai-insights/generate-deal-prediction/', api_views.AIInsightViewSet.as_view({'post': 'generate_deal_prediction'}), name='ai-insights-deal-prediction'),
+
+    # Email Templates & Campaigns
+    path('email-templates/', api_views.EmailTemplateViewSet.as_view({'get': 'list', 'post': 'create'}), name='email-templates-list'),
+    path('email-templates/<int:pk>/', api_views.EmailTemplateViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='email-templates-detail'),
+    path('email-campaigns/', api_views.EmailCampaignViewSet.as_view({'get': 'list', 'post': 'create'}), name='email-campaigns-list'),
+    path('email-campaigns/<int:pk>/', api_views.EmailCampaignViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='email-campaigns-detail'),
+
+    # Webhooks
+    path('webhooks/', api_views.WebhookViewSet.as_view({'get': 'list', 'post': 'create'}), name='webhooks-list'),
+    path('webhooks/<int:pk>/', api_views.WebhookViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='webhooks-detail'),
+
+    # External Integrations
+    path('integrations/', api_views.ExternalIntegrationViewSet.as_view({'get': 'list', 'post': 'create'}), name='integrations-list'),
+    path('integrations/<int:pk>/', api_views.ExternalIntegrationViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='integrations-detail'),
 ]
