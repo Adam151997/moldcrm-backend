@@ -16,6 +16,10 @@ sendgrid==6.11.0
 celery==5.3.4
 redis==5.0.1
 
+# Email Provider SDKs
+mailchimp-transactional==1.0.56
+sib-api-v3-sdk==7.6.0
+
 # Webhooks & Integrations
 requests==2.31.0
 cryptography==41.0.7

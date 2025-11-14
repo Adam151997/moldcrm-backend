@@ -3,7 +3,7 @@ from crm.models import Lead, Contact, Deal, PipelineStage
 from custom_objects.models import CustomObject, CustomField, CustomObjectRecord
 from templates.models import BusinessTemplate, AppliedTemplate
 from automation.models import Workflow, WorkflowExecution, AIInsight
-from integrations.models import EmailTemplate, EmailCampaign, Email, Webhook, WebhookLog, ExternalIntegration
+from integrations.models import EmailTemplate, EmailCampaign, Email, EmailProvider, Webhook, WebhookLog, ExternalIntegration
 from users.models import User
 
 class UserSerializer(serializers.ModelSerializer):
@@ -159,7 +159,7 @@ class WebhookLogSerializer(serializers.ModelSerializer):
 class ExternalIntegrationSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     platform_display = serializers.CharField(source='get_platform_display', read_only=True)
-    
+
     class Meta:
         model = ExternalIntegration
         fields = '__all__'
@@ -170,3 +170,52 @@ class ExternalIntegrationSerializer(serializers.ModelSerializer):
             'access_token': {'write_only': True},
             'refresh_token': {'write_only': True},
         }
+
+class EmailProviderSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    provider_display = serializers.CharField(source='get_provider_type_display', read_only=True)
+    masked_api_key = serializers.CharField(source='get_masked_api_key', read_only=True)
+
+    class Meta:
+        model = EmailProvider
+        fields = [
+            'id', 'provider_type', 'provider_display', 'name',
+            'sender_email', 'sender_name', 'config',
+            'is_active', 'is_verified', 'priority',
+            'daily_limit', 'monthly_limit', 'sent_today', 'sent_this_month',
+            'last_error', 'last_sent_at', 'masked_api_key',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'created_by', 'created_by_name', 'created_at', 'updated_at', 'account',
+            'is_verified', 'sent_today', 'sent_this_month', 'last_error', 'last_sent_at',
+            'provider_display', 'masked_api_key'
+        ]
+        extra_kwargs = {
+            'api_key': {'write_only': True},
+            'api_secret': {'write_only': True},
+        }
+
+    def create(self, validated_data):
+        from integrations.services.encryption import encrypt_api_key
+
+        # Encrypt API keys before saving
+        if 'api_key' in validated_data and validated_data['api_key']:
+            validated_data['api_key'] = encrypt_api_key(validated_data['api_key'])
+
+        if 'api_secret' in validated_data and validated_data['api_secret']:
+            validated_data['api_secret'] = encrypt_api_key(validated_data['api_secret'])
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from integrations.services.encryption import encrypt_api_key
+
+        # Encrypt API keys before saving if they were updated
+        if 'api_key' in validated_data and validated_data['api_key']:
+            validated_data['api_key'] = encrypt_api_key(validated_data['api_key'])
+
+        if 'api_secret' in validated_data and validated_data['api_secret']:
+            validated_data['api_secret'] = encrypt_api_key(validated_data['api_secret'])
+
+        return super().update(instance, validated_data)

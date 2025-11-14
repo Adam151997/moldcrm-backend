@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.authtoken import views
 from . import views as api_views
 from .views_auth import CustomAuthToken
+from integrations.webhooks import views as webhook_views
 
 urlpatterns = [
     # Authentication - USE CUSTOM AUTH
@@ -73,4 +74,19 @@ urlpatterns = [
     # External Integrations
     path('integrations/', api_views.ExternalIntegrationViewSet.as_view({'get': 'list', 'post': 'create'}), name='integrations-list'),
     path('integrations/<int:pk>/', api_views.ExternalIntegrationViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='integrations-detail'),
+
+    # Email Providers
+    path('email-providers/', api_views.EmailProviderViewSet.as_view({'get': 'list', 'post': 'create'}), name='email-providers-list'),
+    path('email-providers/<int:pk>/', api_views.EmailProviderViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='email-providers-detail'),
+    path('email-providers/<int:pk>/verify/', api_views.EmailProviderViewSet.as_view({'post': 'verify'}), name='email-providers-verify'),
+    path('email-providers/<int:pk>/test-send/', api_views.EmailProviderViewSet.as_view({'post': 'test_send'}), name='email-providers-test-send'),
+    path('email-providers/<int:pk>/stats/', api_views.EmailProviderViewSet.as_view({'get': 'stats'}), name='email-providers-stats'),
+    path('email-providers/<int:pk>/toggle-active/', api_views.EmailProviderViewSet.as_view({'post': 'toggle_active'}), name='email-providers-toggle-active'),
+
+    # Email Provider Webhooks (no authentication required)
+    path('webhooks/email/sendgrid/', webhook_views.SendGridWebhookView.as_view(), name='webhook-sendgrid'),
+    path('webhooks/email/mailgun/', webhook_views.MailgunWebhookView.as_view(), name='webhook-mailgun'),
+    path('webhooks/email/brevo/', webhook_views.BrevoWebhookView.as_view(), name='webhook-brevo'),
+    path('webhooks/email/mailchimp/', webhook_views.MailchimpWebhookView.as_view(), name='webhook-mailchimp'),
+    path('webhooks/email/klaviyo/', webhook_views.KlaviyoWebhookView.as_view(), name='webhook-klaviyo'),
 ]
