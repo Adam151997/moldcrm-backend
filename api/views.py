@@ -583,3 +583,102 @@ class ExternalIntegrationViewSet(viewsets.ModelViewSet):
             account=self.request.user.account,
             created_by=self.request.user
         )
+
+
+class EmailProviderViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing email providers"""
+    from .serializers import EmailProviderSerializer
+    serializer_class = EmailProviderSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import EmailProvider
+        return EmailProvider.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )
+
+    @action(detail=True, methods=['post'])
+    def verify(self, request, pk=None):
+        """Verify provider API key and sender email"""
+        from integrations.services.email_provider_service import EmailProviderService
+
+        provider = self.get_object()
+
+        is_valid, message = EmailProviderService.validate_provider(provider)
+
+        if is_valid:
+            provider.is_verified = True
+            provider.save(update_fields=['is_verified'])
+            return Response({
+                'success': True,
+                'message': message
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': message
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def test_send(self, request, pk=None):
+        """Send a test email through this provider"""
+        from integrations.services.email_provider_service import EmailProviderService
+
+        provider = self.get_object()
+
+        # Get test email address from request
+        test_email = request.data.get('test_email')
+        if not test_email:
+            return Response({
+                'success': False,
+                'message': 'test_email is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create test email data
+        email_data = {
+            'to_email': test_email,
+            'subject': 'Test Email from MoldCRM',
+            'body_html': '<h1>Test Email</h1><p>This is a test email from your email provider configuration.</p>',
+            'body_text': 'Test Email - This is a test email from your email provider configuration.',
+        }
+
+        # Send email
+        response = EmailProviderService.send_email(provider, email_data)
+
+        if response.success:
+            return Response({
+                'success': True,
+                'message': 'Test email sent successfully',
+                'message_id': response.message_id
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': response.error_message
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def stats(self, request, pk=None):
+        """Get provider statistics"""
+        from integrations.services.email_provider_service import EmailProviderService
+
+        provider = self.get_object()
+        stats = EmailProviderService.get_provider_stats(provider)
+
+        return Response(stats, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        """Toggle provider active status"""
+        provider = self.get_object()
+        provider.is_active = not provider.is_active
+        provider.save(update_fields=['is_active'])
+
+        return Response({
+            'success': True,
+            'is_active': provider.is_active
+        }, status=status.HTTP_200_OK)

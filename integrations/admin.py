@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    EmailTemplate, EmailCampaign, Email, 
+    EmailTemplate, EmailCampaign, Email, EmailProvider,
     Webhook, WebhookLog, ExternalIntegration
 )
 
@@ -27,6 +27,15 @@ class EmailAdmin(admin.ModelAdmin):
     list_filter = ['status', 'sent_at']
     search_fields = ['subject', 'to_email', 'from_email']
     ordering = ['-created_at']
+
+
+@admin.register(EmailProvider)
+class EmailProviderAdmin(admin.ModelAdmin):
+    list_display = ['name', 'provider_type', 'sender_email', 'account', 'is_active', 'is_verified', 'sent_today', 'sent_this_month']
+    list_filter = ['provider_type', 'is_active', 'is_verified', 'created_at']
+    search_fields = ['name', 'sender_email', 'account__name']
+    ordering = ['priority', 'name']
+    readonly_fields = ['created_at', 'updated_at', 'last_sent_at', 'sent_today', 'sent_this_month']
 
 
 @admin.register(Webhook)
