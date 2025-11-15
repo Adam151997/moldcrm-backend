@@ -217,10 +217,7 @@ Always maintain a professional, helpful tone.
             config = types.GenerateContentConfig(
                 tools=self.tools,
                 system_instruction=self.system_instruction,
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(
-                    disable=True,
-                    maximum_remote_calls=0  # Must be 0 when disabled to avoid conflicts
-                )
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
             )
 
             # Create chat session with tools and system instruction
@@ -254,7 +251,16 @@ Always maintain a professional, helpful tone.
                     # Execute the function
                     tool_function = ai_tools.get_tool_by_name(function_name)
                     if tool_function:
-                        function_result = tool_function(**function_args)
+                        try:
+                            function_result = tool_function(**function_args)
+                        except Exception as func_error:
+                            # If function execution fails, return error to user
+                            return {
+                                'success': False,
+                                'response': f"Error executing {function_name}: {str(func_error)}",
+                                'error': str(func_error),
+                                'function_calls': function_calls_made
+                            }
 
                         # Track the call
                         function_calls_made.append({
@@ -264,11 +270,21 @@ Always maintain a professional, helpful tone.
                         })
 
                         # Send the function result back to the model
-                        function_response_part = types.Part.from_function_response(
-                            name=function_name,
-                            response={'result': function_result}
-                        )
-                        response = chat.send_message(function_response_part)
+                        try:
+                            function_response_part = types.Part.from_function_response(
+                                name=function_name,
+                                response={'result': function_result}
+                            )
+                            response = chat.send_message(function_response_part)
+                        except Exception as send_error:
+                            # If sending function response fails, return error
+                            return {
+                                'success': False,
+                                'response': f"Error sending function response: {str(send_error)}",
+                                'error': str(send_error),
+                                'function_calls': function_calls_made
+                            }
+
                         iteration += 1
                         continue
                     else:
