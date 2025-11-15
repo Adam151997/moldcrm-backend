@@ -490,3 +490,436 @@ def scheduled_plugin_sync_task():
     except Exception as e:
         logger.error(f"Error in scheduled plugin sync: {str(e)}", exc_info=True)
         return {'success': False, 'error': str(e)}
+
+
+# Enhanced Email Campaign Tasks
+
+@shared_task
+def process_drip_campaigns_task():
+    """
+    Process all active drip campaigns and send due emails
+    Run this task periodically (e.g., every 15 minutes)
+    """
+    from integrations.models import DripCampaign, DripCampaignEnrollment, Email, EmailTemplate
+    from integrations.services.template_engine import TemplateEngine
+    from integrations.services.email_provider_service import EmailProviderService
+    from django.utils import timezone
+
+    try:
+        # Get all enrollments that are due for sending
+        now = timezone.now()
+        due_enrollments = DripCampaignEnrollment.objects.filter(
+            status='active',
+            next_send_at__lte=now,
+            drip_campaign__is_active=True,
+            drip_campaign__status='active'
+        ).select_related('drip_campaign', 'current_step', 'contact', 'lead')
+
+        sent_count = 0
+        failed_count = 0
+
+        template_engine = TemplateEngine()
+
+        for enrollment in due_enrollments:
+            try:
+                # Get the current step
+                step = enrollment.current_step
+                drip = enrollment.drip_campaign
+
+                # Get recipient
+                recipient = enrollment.contact if enrollment.contact else enrollment.lead
+                if not recipient or not recipient.email:
+                    continue
+
+                # Get template
+                template = step.template
+                subject = step.subject_override or template.subject
+                content = step.content_override or template.body_html
+
+                # Render template with recipient data
+                recipient_data = {
+                    'first_name': getattr(recipient, 'first_name', ''),
+                    'last_name': getattr(recipient, 'last_name', ''),
+                    'email': recipient.email,
+                }
+
+                rendered_content = template_engine.render(
+                    content,
+                    {},
+                    recipient=recipient,
+                    campaign=None
+                )
+
+                # Create email record
+                email_obj = Email.objects.create(
+                    account=drip.account,
+                    drip_campaign_step=step,
+                    from_email=drip.account.name,
+                    to_email=recipient.email,
+                    subject=subject,
+                    body_html=rendered_content,
+                    status='queued'
+                )
+
+                # Send email
+                email_data = {
+                    'to_email': recipient.email,
+                    'subject': subject,
+                    'body_html': rendered_content,
+                }
+
+                # Send using default provider strategy
+                from integrations.models import EmailProvider
+                provider = EmailProvider.objects.filter(
+                    account=drip.account,
+                    is_active=True
+                ).first()
+
+                if provider:
+                    response = EmailProviderService.send_email(provider, email_data)
+
+                    if response.success:
+                        email_obj.status = 'sent'
+                        email_obj.sent_at = timezone.now()
+                        email_obj.provider_message_id = response.message_id
+
+                        # Update enrollment
+                        enrollment.steps_completed += 1
+                        step.sent_count += 1
+                        step.save(update_fields=['sent_count'])
+
+                        # Check for branching
+                        if step.has_branch and step.branch_conditions:
+                            # Simplified branching logic - can be expanded
+                            next_step = step.branch_true_step or _get_next_step(step)
+                        else:
+                            next_step = _get_next_step(step)
+
+                        if next_step:
+                            enrollment.current_step = next_step
+                            enrollment.next_send_at = _calculate_next_send_time(
+                                next_step, drip.skip_weekends, drip.send_time_hour
+                            )
+                        else:
+                            # Sequence completed
+                            enrollment.status = 'completed'
+                            enrollment.completed_at = timezone.now()
+
+                        enrollment.save()
+                        sent_count += 1
+                    else:
+                        email_obj.status = 'failed'
+                        email_obj.error_message = response.error_message
+                        failed_count += 1
+
+                    email_obj.save()
+
+            except Exception as e:
+                logger.error(f"Error processing drip enrollment {enrollment.id}: {str(e)}", exc_info=True)
+                failed_count += 1
+
+        logger.info(f"Drip campaigns processed: {sent_count} sent, {failed_count} failed")
+
+        return {
+            'success': True,
+            'sent': sent_count,
+            'failed': failed_count
+        }
+
+    except Exception as e:
+        logger.error(f"Error processing drip campaigns: {str(e)}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+def _get_next_step(current_step):
+    """Get the next step in sequence"""
+    from integrations.models import DripCampaignStep
+
+    next_step_number = current_step.step_number + 1
+    return DripCampaignStep.objects.filter(
+        drip_campaign=current_step.drip_campaign,
+        step_number=next_step_number,
+        is_active=True
+    ).first()
+
+
+def _calculate_next_send_time(step, skip_weekends=False, send_hour=10):
+    """Calculate next send time based on step delay"""
+    from django.utils import timezone
+    import datetime
+
+    now = timezone.now()
+
+    # Add delay based on step settings
+    if step.delay_unit == 'minutes':
+        next_time = now + timezone.timedelta(minutes=step.delay_value)
+    elif step.delay_unit == 'hours':
+        next_time = now + timezone.timedelta(hours=step.delay_value)
+    elif step.delay_unit == 'days':
+        next_time = now + timezone.timedelta(days=step.delay_value)
+    elif step.delay_unit == 'weeks':
+        next_time = now + timezone.timedelta(weeks=step.delay_value)
+    else:
+        next_time = now + timezone.timedelta(days=1)
+
+    # Set to specific hour if configured
+    if send_hour:
+        next_time = next_time.replace(hour=send_hour, minute=0, second=0)
+
+    # Skip weekends if configured
+    if skip_weekends:
+        while next_time.weekday() >= 5:  # 5=Saturday, 6=Sunday
+            next_time += timezone.timedelta(days=1)
+
+    return next_time
+
+
+@shared_task
+def calculate_ab_test_results_task(ab_test_id):
+    """
+    Calculate A/B test results and determine winner
+
+    Args:
+        ab_test_id: CampaignABTest ID
+    """
+    from integrations.models import CampaignABTest
+    from django.utils import timezone
+    import math
+
+    try:
+        ab_test = CampaignABTest.objects.get(id=ab_test_id)
+
+        # Collect variant data
+        variants = []
+        for variant in ['a', 'b', 'c', 'd', 'e']:
+            sent = getattr(ab_test, f'variant_{variant}_sent', 0)
+            if sent > 0:
+                opens = getattr(ab_test, f'variant_{variant}_opens', 0)
+                clicks = getattr(ab_test, f'variant_{variant}_clicks', 0)
+                conversions = getattr(ab_test, f'variant_{variant}_conversions', 0)
+
+                # Calculate rate based on win metric
+                if ab_test.win_metric == 'open_rate':
+                    rate = opens / sent
+                elif ab_test.win_metric == 'click_rate':
+                    rate = clicks / sent
+                elif ab_test.win_metric == 'conversion_rate':
+                    rate = conversions / sent
+                else:
+                    rate = opens / sent
+
+                variants.append({
+                    'name': variant,
+                    'sent': sent,
+                    'rate': rate,
+                    'successes': opens if ab_test.win_metric == 'open_rate' else clicks if ab_test.win_metric == 'click_rate' else conversions
+                })
+
+        if len(variants) < 2:
+            return {'success': False, 'error': 'Not enough variants'}
+
+        # Find winner (highest rate)
+        winner = max(variants, key=lambda x: x['rate'])
+
+        # Simple statistical significance check using z-test for proportions
+        # Compare winner with second best
+        sorted_variants = sorted(variants, key=lambda x: x['rate'], reverse=True)
+        if len(sorted_variants) >= 2:
+            v1 = sorted_variants[0]
+            v2 = sorted_variants[1]
+
+            # Calculate z-score
+            p1 = v1['rate']
+            p2 = v2['rate']
+            n1 = v1['sent']
+            n2 = v2['sent']
+
+            pooled_p = (v1['successes'] + v2['successes']) / (n1 + n2)
+            se = math.sqrt(pooled_p * (1 - pooled_p) * (1/n1 + 1/n2))
+
+            if se > 0:
+                z_score = abs(p1 - p2) / se
+                # For 95% confidence, z-score should be > 1.96
+                is_significant = z_score > 1.96
+            else:
+                is_significant = False
+        else:
+            is_significant = False
+
+        # Update AB test with results
+        ab_test.winner_variant = winner['name']
+        ab_test.is_statistically_significant = is_significant
+        ab_test.status = 'completed'
+        ab_test.completed_at = timezone.now()
+        ab_test.save()
+
+        logger.info(f"A/B test {ab_test_id} completed: Winner is variant {winner['name']}")
+
+        return {
+            'success': True,
+            'winner': winner['name'],
+            'is_significant': is_significant
+        }
+
+    except CampaignABTest.DoesNotExist:
+        logger.error(f"CampaignABTest {ab_test_id} not found")
+        return {'success': False, 'error': 'A/B test not found'}
+    except Exception as e:
+        logger.error(f"Error calculating A/B test results: {str(e)}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@shared_task
+def update_segment_sizes_task():
+    """
+    Update cached sizes for all dynamic segments
+    Run this task periodically (e.g., hourly)
+    """
+    from integrations.models import Segment
+    from integrations.services.segmentation_engine import SegmentationEngine
+
+    try:
+        # Get all active dynamic segments with auto-update enabled
+        segments = Segment.objects.filter(
+            is_active=True,
+            auto_update=True,
+            segment_type='dynamic'
+        )
+
+        updated_count = 0
+
+        for segment in segments:
+            try:
+                engine = SegmentationEngine(segment.account)
+                engine.update_segment_size(segment)
+                updated_count += 1
+            except Exception as e:
+                logger.error(f"Error updating segment {segment.id}: {str(e)}")
+
+        logger.info(f"Updated {updated_count} segment sizes")
+
+        return {
+            'success': True,
+            'updated': updated_count
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating segment sizes: {str(e)}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@shared_task
+def calculate_campaign_analytics_task(campaign_id):
+    """
+    Calculate and cache campaign analytics
+
+    Args:
+        campaign_id: EmailCampaign ID
+    """
+    from integrations.models import EmailCampaign, Email, EmailEngagement, LinkClick
+    from django.db.models import Count, Q
+
+    try:
+        campaign = EmailCampaign.objects.get(id=campaign_id)
+
+        # Calculate engagement metrics
+        emails = Email.objects.filter(campaign=campaign)
+        total_sent = emails.count()
+
+        if total_sent > 0:
+            # Opens
+            opened_emails = emails.filter(engagement__opens_count__gt=0).distinct()
+            campaign.opens_count = EmailEngagement.objects.filter(
+                email__campaign=campaign
+            ).aggregate(total=Count('id'))['total'] or 0
+            campaign.unique_opens = opened_emails.count()
+            campaign.open_rate = (campaign.unique_opens / total_sent) * 100
+
+            # Clicks
+            clicked_emails = emails.filter(link_clicks__isnull=False).distinct()
+            campaign.clicks_count = LinkClick.objects.filter(
+                email__campaign=campaign
+            ).count()
+            campaign.unique_clicks = clicked_emails.count()
+            campaign.click_rate = (campaign.unique_clicks / total_sent) * 100
+
+            # Click-to-open rate
+            if campaign.unique_opens > 0:
+                campaign.click_to_open_rate = (campaign.unique_clicks / campaign.unique_opens) * 100
+
+            # Bounces
+            campaign.bounced_count = emails.filter(status='bounced').count()
+            campaign.bounce_rate = (campaign.bounced_count / total_sent) * 100
+
+            # Failed
+            campaign.failed_count = emails.filter(status='failed').count()
+
+            campaign.save()
+
+            logger.info(f"Analytics calculated for campaign {campaign_id}")
+
+            return {'success': True, 'campaign_id': campaign_id}
+
+        return {'success': False, 'error': 'No emails sent'}
+
+    except EmailCampaign.DoesNotExist:
+        logger.error(f"EmailCampaign {campaign_id} not found")
+        return {'success': False, 'error': 'Campaign not found'}
+    except Exception as e:
+        logger.error(f"Error calculating campaign analytics: {str(e)}", exc_info=True)
+        return {'success': False, 'error': str(e)}
+
+
+@shared_task
+def update_campaign_goals_task(campaign_id):
+    """
+    Update progress for all goals associated with a campaign
+
+    Args:
+        campaign_id: EmailCampaign ID
+    """
+    from integrations.models import CampaignGoal, EmailCampaign
+    from django.utils import timezone
+
+    try:
+        campaign = EmailCampaign.objects.get(id=campaign_id)
+        goals = CampaignGoal.objects.filter(campaign=campaign)
+
+        for goal in goals:
+            # Update actual value based on goal type
+            if goal.goal_type == 'open_rate':
+                goal.actual_value = campaign.open_rate
+            elif goal.goal_type == 'click_rate':
+                goal.actual_value = campaign.click_rate
+            elif goal.goal_type == 'conversion_rate':
+                goal.actual_value = campaign.conversion_rate
+            elif goal.goal_type == 'total_opens':
+                goal.actual_value = campaign.unique_opens
+            elif goal.goal_type == 'total_clicks':
+                goal.actual_value = campaign.unique_clicks
+            elif goal.goal_type == 'total_conversions':
+                goal.actual_value = campaign.conversion_count
+            elif goal.goal_type == 'revenue':
+                goal.actual_value = float(campaign.revenue_generated)
+
+            # Calculate progress
+            if goal.target_value > 0:
+                goal.progress_percentage = min((goal.actual_value / goal.target_value) * 100, 100)
+
+            # Check if achieved
+            if goal.actual_value >= goal.target_value and not goal.is_achieved:
+                goal.is_achieved = True
+                goal.achieved_at = timezone.now()
+
+            goal.save()
+
+        logger.info(f"Updated {goals.count()} goals for campaign {campaign_id}")
+
+        return {'success': True, 'goals_updated': goals.count()}
+
+    except EmailCampaign.DoesNotExist:
+        logger.error(f"EmailCampaign {campaign_id} not found")
+        return {'success': False, 'error': 'Campaign not found'}
+    except Exception as e:
+        logger.error(f"Error updating campaign goals: {str(e)}", exc_info=True)
+        return {'success': False, 'error': str(e)}

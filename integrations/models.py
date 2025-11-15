@@ -6,7 +6,7 @@ from crm.models import Lead, Contact, Deal
 
 class EmailTemplate(models.Model):
     """
-    Email templates for automated communications
+    Email templates for automated communications - ENHANCED
     """
     TEMPLATE_TYPES = [
         ('welcome', 'Welcome Email'),
@@ -14,19 +14,95 @@ class EmailTemplate(models.Model):
         ('proposal', 'Proposal'),
         ('thank_you', 'Thank You'),
         ('reminder', 'Reminder'),
+        ('newsletter', 'Newsletter'),
+        ('promotional', 'Promotional'),
+        ('transactional', 'Transactional'),
+        ('drip', 'Drip Sequence'),
         ('custom', 'Custom'),
+    ]
+
+    CATEGORY_CHOICES = [
+        ('marketing', 'Marketing'),
+        ('sales', 'Sales'),
+        ('support', 'Support'),
+        ('transactional', 'Transactional'),
+        ('automated', 'Automated'),
     ]
 
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='email_templates')
     name = models.CharField(max_length=200)
     template_type = models.CharField(max_length=50, choices=TEMPLATE_TYPES)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='marketing')
+
+    # Email content
     subject = models.CharField(max_length=200)
+    preview_text = models.CharField(max_length=150, blank=True, help_text="Inbox preview text (preheader)")
     body_html = models.TextField()
     body_text = models.TextField(blank=True)  # Plain text version
-    
+
+    # Visual editor support
+    design_json = models.JSONField(default=dict, blank=True, help_text="Design structure for visual builder")
+    thumbnail = models.URLField(max_length=500, blank=True, help_text="Template preview image")
+
     # Variables that can be used in template
     available_variables = models.JSONField(default=list)  # ['{{contact.name}}', '{{deal.amount}}', etc.]
-    
+
+    # AI & Optimization
+    ai_optimization_score = models.IntegerField(default=0, help_text="AI-generated optimization score (0-100)")
+    spam_score = models.FloatField(default=0.0, help_text="Spam probability score")
+
+    # Usage stats
+    usage_count = models.IntegerField(default=0, help_text="Number of times template has been used")
+    avg_open_rate = models.FloatField(default=0.0, help_text="Average open rate across campaigns")
+    avg_click_rate = models.FloatField(default=0.0, help_text="Average click rate across campaigns")
+
+    is_active = models.BooleanField(default=True)
+    is_archived = models.BooleanField(default=False)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['account', 'category']),
+            models.Index(fields=['template_type', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.account.name})"
+
+
+class Segment(models.Model):
+    """
+    Advanced recipient segmentation with visual filter builder support
+    """
+    SEGMENT_TYPES = [
+        ('static', 'Static List'),
+        ('dynamic', 'Dynamic (Auto-Update)'),
+        ('behavioral', 'Behavioral'),
+    ]
+
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='segments')
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    segment_type = models.CharField(max_length=20, choices=SEGMENT_TYPES, default='dynamic')
+
+    # Filter conditions (supports complex AND/OR logic)
+    filter_conditions = models.JSONField(default=dict, help_text="Visual filter builder conditions")
+
+    # Static list support
+    static_contacts = models.ManyToManyField(Contact, blank=True, related_name='static_segments')
+    static_leads = models.ManyToManyField(Lead, blank=True, related_name='static_segments')
+
+    # Size tracking
+    estimated_size = models.IntegerField(default=0, help_text="Estimated recipient count")
+    actual_size = models.IntegerField(default=0, help_text="Actual recipient count (after calculation)")
+    last_calculated_at = models.DateTimeField(null=True, blank=True)
+
+    # Auto-update for dynamic segments
+    auto_update = models.BooleanField(default=True, help_text="Auto-recalculate before each campaign")
+
     is_active = models.BooleanField(default=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -34,14 +110,17 @@ class EmailTemplate(models.Model):
 
     class Meta:
         ordering = ['name']
+        indexes = [
+            models.Index(fields=['account', 'segment_type']),
+        ]
 
     def __str__(self):
-        return f"{self.name} ({self.account.name})"
+        return f"{self.name} ({self.actual_size} recipients)"
 
 
 class EmailCampaign(models.Model):
     """
-    Email campaigns for bulk sending
+    Email campaigns for bulk sending - SIGNIFICANTLY ENHANCED
     """
     STATUS_CHOICES = [
         ('draft', 'Draft'),
@@ -49,11 +128,28 @@ class EmailCampaign(models.Model):
         ('sending', 'Sending'),
         ('completed', 'Completed'),
         ('paused', 'Paused'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    CAMPAIGN_TYPES = [
+        ('one_time', 'One-Time Broadcast'),
+        ('recurring', 'Recurring'),
+        ('triggered', 'Triggered/Automated'),
+        ('ab_test', 'A/B Test'),
+    ]
+
+    SEND_OPTIMIZATION = [
+        ('immediate', 'Send Immediately'),
+        ('optimal_time', 'Optimal Time (AI)'),
+        ('time_zone_aware', 'Time Zone Aware'),
+        ('scheduled', 'Scheduled Time'),
     ]
 
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='email_campaigns')
     name = models.CharField(max_length=200)
-    template = models.ForeignKey(EmailTemplate, on_delete=models.SET_NULL, null=True)
+    description = models.TextField(blank=True)
+    campaign_type = models.CharField(max_length=20, choices=CAMPAIGN_TYPES, default='one_time')
+    template = models.ForeignKey(EmailTemplate, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
 
     # Email providers - can use multiple providers for load balancing
@@ -68,28 +164,99 @@ class EmailCampaign(models.Model):
         default='priority'
     )
 
-    # Recipients
-    recipient_filter = models.JSONField(default=dict)  # Query filter for recipients
-    
-    # Schedule
+    # Recipients - Enhanced
+    segment = models.ForeignKey(Segment, on_delete=models.SET_NULL, null=True, blank=True, related_name='campaigns')
+    recipient_filter = models.JSONField(default=dict, help_text="Legacy/simple filter (deprecated, use segment)")
+
+    # Sending options
+    send_optimization = models.CharField(max_length=20, choices=SEND_OPTIMIZATION, default='immediate')
     scheduled_at = models.DateTimeField(null=True, blank=True)
-    
-    # Stats
+    throttle_rate = models.IntegerField(default=0, help_text="Emails per hour (0 = no throttling)")
+
+    # A/B Testing
+    ab_test_enabled = models.BooleanField(default=False)
+    ab_test_config = models.JSONField(default=dict, blank=True, help_text="A/B test configuration")
+
+    # Link tracking & UTM parameters
+    utm_campaign = models.CharField(max_length=200, blank=True)
+    utm_source = models.CharField(max_length=100, blank=True, default='moldcrm')
+    utm_medium = models.CharField(max_length=100, blank=True, default='email')
+    utm_content = models.CharField(max_length=200, blank=True)
+    utm_term = models.CharField(max_length=200, blank=True)
+    track_clicks = models.BooleanField(default=True)
+    track_opens = models.BooleanField(default=True)
+
+    # Goal tracking
+    goal_metric = models.CharField(max_length=50, blank=True, help_text="open_rate, click_rate, conversion, revenue")
+    goal_value = models.FloatField(default=0.0, help_text="Target value for goal")
+
+    # Enhanced Stats
     total_recipients = models.IntegerField(default=0)
     sent_count = models.IntegerField(default=0)
+    delivered_count = models.IntegerField(default=0)
     opened_count = models.IntegerField(default=0)
+    unique_opens = models.IntegerField(default=0)
     clicked_count = models.IntegerField(default=0)
+    unique_clicks = models.IntegerField(default=0)
     bounced_count = models.IntegerField(default=0)
-    
+    hard_bounces = models.IntegerField(default=0)
+    soft_bounces = models.IntegerField(default=0)
+    unsubscribed_count = models.IntegerField(default=0)
+    spam_complaints = models.IntegerField(default=0)
+    failed_count = models.IntegerField(default=0)
+
+    # Conversion & Revenue tracking
+    conversion_count = models.IntegerField(default=0)
+    revenue_generated = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+
+    # Calculated rates
+    delivery_rate = models.FloatField(default=0.0)
+    open_rate = models.FloatField(default=0.0)
+    click_rate = models.FloatField(default=0.0)
+    click_to_open_rate = models.FloatField(default=0.0)
+    bounce_rate = models.FloatField(default=0.0)
+    unsubscribe_rate = models.FloatField(default=0.0)
+    conversion_rate = models.FloatField(default=0.0)
+
+    # Timing
+    started_sending_at = models.DateTimeField(null=True, blank=True)
+    completed_sending_at = models.DateTimeField(null=True, blank=True)
+    send_duration_seconds = models.IntegerField(default=0)
+
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['account', 'status']),
+            models.Index(fields=['campaign_type', 'status']),
+            models.Index(fields=['scheduled_at']),
+        ]
 
     def __str__(self):
         return f"{self.name} - {self.status}"
+
+    def calculate_rates(self):
+        """Calculate all campaign rates"""
+        if self.sent_count > 0:
+            self.delivery_rate = (self.delivered_count / self.sent_count) * 100
+            self.bounce_rate = (self.bounced_count / self.sent_count) * 100
+            self.unsubscribe_rate = (self.unsubscribed_count / self.sent_count) * 100
+
+        if self.delivered_count > 0:
+            self.open_rate = (self.unique_opens / self.delivered_count) * 100
+            self.click_rate = (self.unique_clicks / self.delivered_count) * 100
+            self.conversion_rate = (self.conversion_count / self.delivered_count) * 100
+
+        if self.unique_opens > 0:
+            self.click_to_open_rate = (self.unique_clicks / self.unique_opens) * 100
+
+        self.save(update_fields=[
+            'delivery_rate', 'open_rate', 'click_rate', 'click_to_open_rate',
+            'bounce_rate', 'unsubscribe_rate', 'conversion_rate'
+        ])
 
 
 class Email(models.Model):
@@ -143,6 +310,400 @@ class Email(models.Model):
 
     def __str__(self):
         return f"{self.subject} to {self.to_email}"
+
+
+class CampaignABTest(models.Model):
+    """
+    A/B Testing for email campaigns
+    """
+    STATUS_CHOICES = [
+        ('testing', 'Testing'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    campaign = models.ForeignKey(EmailCampaign, on_delete=models.CASCADE, related_name='ab_tests')
+    test_name = models.CharField(max_length=200)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='testing')
+
+    # Test configuration
+    test_element = models.CharField(max_length=50, help_text="subject, from_name, content, send_time")
+    variant_a_value = models.TextField(help_text="Value for variant A")
+    variant_b_value = models.TextField(help_text="Value for variant B")
+    variant_c_value = models.TextField(blank=True, help_text="Optional variant C")
+    variant_d_value = models.TextField(blank=True, help_text="Optional variant D")
+    variant_e_value = models.TextField(blank=True, help_text="Optional variant E")
+
+    # Traffic split (percentages)
+    test_percentage = models.IntegerField(default=20, help_text="Percentage of total for testing")
+    variant_a_percentage = models.IntegerField(default=50, help_text="Percentage within test group")
+    variant_b_percentage = models.IntegerField(default=50)
+    variant_c_percentage = models.IntegerField(default=0)
+    variant_d_percentage = models.IntegerField(default=0)
+    variant_e_percentage = models.IntegerField(default=0)
+
+    # Win criteria
+    win_metric = models.CharField(max_length=50, default='open_rate', help_text="open_rate, click_rate, conversion")
+    auto_select_winner = models.BooleanField(default=True)
+    hours_to_test = models.IntegerField(default=24, help_text="Duration before selecting winner")
+
+    # Results
+    variant_a_sent = models.IntegerField(default=0)
+    variant_a_opens = models.IntegerField(default=0)
+    variant_a_clicks = models.IntegerField(default=0)
+    variant_a_conversions = models.IntegerField(default=0)
+
+    variant_b_sent = models.IntegerField(default=0)
+    variant_b_opens = models.IntegerField(default=0)
+    variant_b_clicks = models.IntegerField(default=0)
+    variant_b_conversions = models.IntegerField(default=0)
+
+    variant_c_sent = models.IntegerField(default=0)
+    variant_c_opens = models.IntegerField(default=0)
+    variant_c_clicks = models.IntegerField(default=0)
+
+    variant_d_sent = models.IntegerField(default=0)
+    variant_e_sent = models.IntegerField(default=0)
+
+    # Winner
+    winning_variant = models.CharField(max_length=1, blank=True, help_text="A, B, C, D, or E")
+    is_statistically_significant = models.BooleanField(default=False)
+    confidence_level = models.FloatField(default=0.0, help_text="Statistical confidence (0-100)")
+
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"{self.campaign.name} - {self.test_element} test"
+
+
+class DripCampaign(models.Model):
+    """
+    Automated email drip sequences
+    """
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('active', 'Active'),
+        ('paused', 'Paused'),
+        ('completed', 'Completed'),
+    ]
+
+    TRIGGER_TYPES = [
+        ('lead_created', 'Lead Created'),
+        ('contact_created', 'Contact Created'),
+        ('deal_stage_changed', 'Deal Stage Changed'),
+        ('tag_added', 'Tag Added'),
+        ('form_submitted', 'Form Submitted'),
+        ('date_based', 'Date-Based (Birthday, Anniversary)'),
+        ('manual', 'Manual Enrollment'),
+        ('webhook', 'Webhook Trigger'),
+    ]
+
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='drip_campaigns')
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    trigger_type = models.CharField(max_length=50, choices=TRIGGER_TYPES)
+    trigger_config = models.JSONField(default=dict, help_text="Trigger-specific configuration")
+
+    # Enrollment rules
+    enrollment_conditions = models.JSONField(default=dict, help_text="Who can enter this drip")
+    allow_re_enrollment = models.BooleanField(default=False)
+    max_enrollments_per_contact = models.IntegerField(default=1)
+
+    # Exit conditions
+    exit_conditions = models.JSONField(default=list, help_text="Conditions to exit sequence")
+    respect_unsubscribes = models.BooleanField(default=True)
+    skip_weekends = models.BooleanField(default=False)
+
+    # Status
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    is_active = models.BooleanField(default=False)
+
+    # Stats
+    total_enrolled = models.IntegerField(default=0)
+    currently_enrolled = models.IntegerField(default=0)
+    completed_count = models.IntegerField(default=0)
+    exited_early_count = models.IntegerField(default=0)
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} - {self.get_trigger_type_display()}"
+
+
+class DripCampaignStep(models.Model):
+    """
+    Individual steps in a drip campaign sequence
+    """
+    drip_campaign = models.ForeignKey(DripCampaign, on_delete=models.CASCADE, related_name='steps')
+    step_number = models.IntegerField(help_text="Order in sequence (1, 2, 3...)")
+    name = models.CharField(max_length=200)
+
+    # Delay from previous step
+    delay_value = models.IntegerField(default=1)
+    delay_unit = models.CharField(max_length=20, choices=[
+        ('minutes', 'Minutes'),
+        ('hours', 'Hours'),
+        ('days', 'Days'),
+        ('weeks', 'Weeks'),
+    ], default='days')
+
+    # Email to send
+    template = models.ForeignKey(EmailTemplate, on_delete=models.SET_NULL, null=True)
+    subject_override = models.CharField(max_length=200, blank=True, help_text="Override template subject")
+
+    # Conditional branching
+    has_branch = models.BooleanField(default=False)
+    branch_conditions = models.JSONField(default=dict, blank=True, help_text="If-then branching logic")
+
+    # Stats
+    sent_count = models.IntegerField(default=0)
+    open_count = models.IntegerField(default=0)
+    click_count = models.IntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['drip_campaign', 'step_number']
+        unique_together = [['drip_campaign', 'step_number']]
+
+    def __str__(self):
+        return f"{self.drip_campaign.name} - Step {self.step_number}: {self.name}"
+
+
+class DripCampaignEnrollment(models.Model):
+    """
+    Tracks individual contact/lead enrollment in drip campaigns
+    """
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('exited', 'Exited Early'),
+        ('paused', 'Paused'),
+    ]
+
+    drip_campaign = models.ForeignKey(DripCampaign, on_delete=models.CASCADE, related_name='enrollments')
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='drip_enrollments')
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, null=True, blank=True, related_name='drip_enrollments')
+
+    current_step = models.ForeignKey(DripCampaignStep, on_delete=models.SET_NULL, null=True, blank=True, related_name='current_enrollments')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+
+    # Timing
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    next_send_at = models.DateTimeField(help_text="When to send next email")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    exited_at = models.DateTimeField(null=True, blank=True)
+    exit_reason = models.CharField(max_length=200, blank=True)
+
+    # Progress tracking
+    steps_completed = models.IntegerField(default=0)
+    total_opens = models.IntegerField(default=0)
+    total_clicks = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-enrolled_at']
+        indexes = [
+            models.Index(fields=['status', 'next_send_at']),
+            models.Index(fields=['drip_campaign', 'status']),
+        ]
+
+    def __str__(self):
+        recipient = self.contact or self.lead
+        return f"{recipient} in {self.drip_campaign.name}"
+
+
+class EmailEngagement(models.Model):
+    """
+    Detailed engagement tracking per recipient
+    """
+    email = models.OneToOneField(Email, on_delete=models.CASCADE, related_name='engagement')
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='email_engagements')
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, null=True, blank=True, related_name='email_engagements')
+
+    # Open tracking
+    opens_count = models.IntegerField(default=0)
+    first_opened_at = models.DateTimeField(null=True, blank=True)
+    last_opened_at = models.DateTimeField(null=True, blank=True)
+
+    # Click tracking
+    clicks_count = models.IntegerField(default=0)
+    first_clicked_at = models.DateTimeField(null=True, blank=True)
+    last_clicked_at = models.DateTimeField(null=True, blank=True)
+
+    # Device & Location
+    device_type = models.CharField(max_length=50, blank=True, help_text="desktop, mobile, tablet")
+    email_client = models.CharField(max_length=100, blank=True, help_text="Gmail, Outlook, etc.")
+    operating_system = models.CharField(max_length=100, blank=True)
+    browser = models.CharField(max_length=100, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    timezone = models.CharField(max_length=50, blank=True)
+
+    # User agent
+    user_agent = models.TextField(blank=True)
+
+    # Engagement score (0-100)
+    engagement_score = models.IntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['contact', 'engagement_score']),
+            models.Index(fields=['device_type']),
+        ]
+
+    def __str__(self):
+        return f"Engagement for {self.email.to_email}"
+
+
+class LinkClick(models.Model):
+    """
+    Individual link click tracking with UTM parameters
+    """
+    email = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='link_clicks')
+    engagement = models.ForeignKey(EmailEngagement, on_delete=models.CASCADE, null=True, blank=True, related_name='clicks')
+
+    # Link details
+    url = models.URLField(max_length=1000)
+    link_text = models.CharField(max_length=500, blank=True, help_text="Anchor text")
+    link_position = models.IntegerField(default=0, help_text="Position in email (1st link, 2nd link, etc.)")
+
+    # UTM tracking
+    utm_source = models.CharField(max_length=100, blank=True)
+    utm_medium = models.CharField(max_length=100, blank=True)
+    utm_campaign = models.CharField(max_length=200, blank=True)
+    utm_content = models.CharField(max_length=200, blank=True)
+    utm_term = models.CharField(max_length=200, blank=True)
+
+    # Click metadata
+    clicked_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    device_type = models.CharField(max_length=50, blank=True)
+    user_agent = models.TextField(blank=True)
+
+    # Geolocation
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ['-clicked_at']
+        indexes = [
+            models.Index(fields=['email', 'url']),
+            models.Index(fields=['clicked_at']),
+        ]
+
+    def __str__(self):
+        return f"Click on {self.url[:50]} at {self.clicked_at}"
+
+
+class UnsubscribePreference(models.Model):
+    """
+    Unsubscribe and email preference management
+    """
+    UNSUBSCRIBE_REASONS = [
+        ('too_frequent', 'Emails too frequent'),
+        ('not_relevant', 'Content not relevant'),
+        ('never_subscribed', 'Never subscribed'),
+        ('privacy_concerns', 'Privacy concerns'),
+        ('other', 'Other'),
+    ]
+
+    FREQUENCY_PREFERENCES = [
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+        ('monthly', 'Monthly'),
+        ('never', 'Never (Unsubscribed)'),
+    ]
+
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='unsubscribe_preferences')
+    contact = models.OneToOneField(Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='unsubscribe_preference')
+    lead = models.OneToOneField(Lead, on_delete=models.CASCADE, null=True, blank=True, related_name='unsubscribe_preference')
+
+    # Global unsubscribe
+    is_unsubscribed = models.BooleanField(default=False)
+    unsubscribed_at = models.DateTimeField(null=True, blank=True)
+    unsubscribe_reason = models.CharField(max_length=50, choices=UNSUBSCRIBE_REASONS, blank=True)
+    unsubscribe_reason_text = models.TextField(blank=True)
+
+    # Campaign from which they unsubscribed
+    unsubscribed_from_campaign = models.ForeignKey(EmailCampaign, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Preference center
+    frequency_preference = models.CharField(max_length=20, choices=FREQUENCY_PREFERENCES, default='weekly')
+    campaign_type_preferences = models.JSONField(default=dict, help_text="Preferences per campaign type")
+
+    # Resubscribe support
+    resubscribe_token = models.CharField(max_length=100, unique=True, blank=True)
+    resubscribed_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['is_unsubscribed']),
+        ]
+
+    def __str__(self):
+        recipient = self.contact or self.lead
+        status = "Unsubscribed" if self.is_unsubscribed else "Subscribed"
+        return f"{recipient} - {status}"
+
+
+class CampaignGoal(models.Model):
+    """
+    Campaign performance goals and tracking
+    """
+    GOAL_TYPES = [
+        ('open_rate', 'Open Rate'),
+        ('click_rate', 'Click Rate'),
+        ('click_to_open_rate', 'Click-to-Open Rate'),
+        ('conversion_rate', 'Conversion Rate'),
+        ('revenue', 'Revenue'),
+        ('engagement_score', 'Engagement Score'),
+    ]
+
+    campaign = models.ForeignKey(EmailCampaign, on_delete=models.CASCADE, related_name='goals')
+    goal_type = models.CharField(max_length=50, choices=GOAL_TYPES)
+    target_value = models.FloatField(help_text="Target value to achieve")
+    actual_value = models.FloatField(default=0.0, help_text="Current actual value")
+
+    # Achievement tracking
+    is_achieved = models.BooleanField(default=False)
+    achieved_at = models.DateTimeField(null=True, blank=True)
+    progress_percentage = models.FloatField(default=0.0, help_text="Progress towards goal (0-100%)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['campaign', 'goal_type']
+
+    def __str__(self):
+        return f"{self.campaign.name} - {self.get_goal_type_display()}: {self.target_value}"
+
+    def update_progress(self):
+        """Calculate progress percentage"""
+        if self.target_value > 0:
+            self.progress_percentage = min((self.actual_value / self.target_value) * 100, 100)
+            self.is_achieved = self.actual_value >= self.target_value
+            if self.is_achieved and not self.achieved_at:
+                from django.utils import timezone
+                self.achieved_at = timezone.now()
+        self.save()
 
 
 class EmailProvider(models.Model):
