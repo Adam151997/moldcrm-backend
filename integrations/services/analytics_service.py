@@ -53,8 +53,8 @@ class CampaignAnalyticsService:
             'campaign_id': campaign.id,
             'campaign_name': campaign.name,
             'status': campaign.status,
-            'sent_at': campaign.sent_at,
-            'completed_at': campaign.completed_at,
+            'sent_at': campaign.started_sending_at,
+            'completed_at': campaign.completed_sending_at,
 
             # Delivery metrics
             'sent_count': total_sent,
@@ -140,10 +140,10 @@ class CampaignAnalyticsService:
 
     def _get_engagement_timeline(self, campaign, hours: int = 48) -> List[Dict[str, Any]]:
         """Get engagement timeline (opens/clicks over time)"""
-        if not campaign.sent_at:
+        if not campaign.started_sending_at:
             return []
 
-        cutoff_time = campaign.sent_at + timedelta(hours=hours)
+        cutoff_time = campaign.started_sending_at + timedelta(hours=hours)
 
         # Get hourly engagement data
         timeline = EmailEngagement.objects.filter(
@@ -220,7 +220,7 @@ class CampaignAnalyticsService:
             campaign_data = {
                 'id': campaign.id,
                 'name': campaign.name,
-                'sent_at': campaign.sent_at,
+                'sent_at': campaign.started_sending_at,
                 'sent_count': campaign.sent_count,
                 'open_rate': round(campaign.open_rate, 2),
                 'click_rate': round(campaign.click_rate, 2),
@@ -277,7 +277,7 @@ class CampaignAnalyticsService:
         campaigns = EmailCampaign.objects.filter(
             segment_id=segment_id,
             account=self.account,
-            sent_at__gte=cutoff_date
+            started_sending_at__gte=cutoff_date
         )
 
         if not campaigns.exists():
@@ -304,10 +304,10 @@ class CampaignAnalyticsService:
                 {
                     'id': c.id,
                     'name': c.name,
-                    'sent_at': c.sent_at,
+                    'sent_at': c.started_sending_at,
                     'open_rate': round(c.open_rate, 2),
                 }
-                for c in campaigns.order_by('-sent_at')[:10]
+                for c in campaigns.order_by('-started_sending_at')[:10]
             ]
         }
 
@@ -402,7 +402,7 @@ class CampaignAnalyticsService:
             campaigns = EmailCampaign.objects.filter(
                 account=self.account,
                 email_provider=provider,
-                sent_at__gte=cutoff_date
+                started_sending_at__gte=cutoff_date
             )
 
             if campaigns.exists():
@@ -517,7 +517,7 @@ class CampaignAnalyticsService:
 
         campaigns = EmailCampaign.objects.filter(
             account=self.account,
-            sent_at__gte=cutoff_date,
+            started_sending_at__gte=cutoff_date,
             revenue_generated__gt=0
         ).order_by('-revenue_generated')
 
@@ -569,7 +569,7 @@ class CampaignAnalyticsService:
 
         campaigns = EmailCampaign.objects.filter(
             account=self.account,
-            sent_at__gte=cutoff_date
+            started_sending_at__gte=cutoff_date
         )
 
         stats = campaigns.aggregate(
