@@ -93,7 +93,6 @@ urlpatterns = [
 
     # Plugin Integration Endpoints
     path('plugins/', api_views.PluginViewSet.as_view({'get': 'list', 'post': 'create'}), name='plugins-list'),
-    path('plugins/available-platforms/', api_views.PluginViewSet.as_view({'get': 'available_platforms'}), name='plugins-available-platforms'),
     path('plugins/<int:pk>/', api_views.PluginViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='plugins-detail'),
     path('plugins/<int:pk>/oauth-url/', api_views.PluginViewSet.as_view({'get': 'oauth_url'}), name='plugins-oauth-url'),
     path('plugins/<int:pk>/oauth-callback/', api_views.PluginViewSet.as_view({'post': 'oauth_callback'}), name='plugins-oauth-callback'),

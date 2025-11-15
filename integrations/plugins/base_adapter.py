@@ -191,22 +191,17 @@ class BasePluginAdapter(ABC):
     def get_decrypted_credentials(self) -> Dict[str, str]:
         """
         Get decrypted credentials from plugin
-        Uses centralized credentials if available, otherwise user-provided
 
         Returns:
             Dictionary with decrypted credential values
         """
         from integrations.services.encryption import decrypt_value
-        from integrations.plugins.plugin_service import PluginService
 
         credentials = {}
-
-        # Get OAuth client credentials (centralized or user-provided)
-        oauth_creds = PluginService.get_oauth_credentials(self.plugin)
-        credentials['client_id'] = oauth_creds['client_id']
-        credentials['client_secret'] = oauth_creds['client_secret']
-
-        # Get user-specific tokens (always from plugin instance)
+        if self.plugin.client_id:
+            credentials['client_id'] = decrypt_value(self.plugin.client_id)
+        if self.plugin.client_secret:
+            credentials['client_secret'] = decrypt_value(self.plugin.client_secret)
         if self.plugin.access_token:
             credentials['access_token'] = decrypt_value(self.plugin.access_token)
         if self.plugin.refresh_token:
