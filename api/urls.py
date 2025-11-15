@@ -2,6 +2,11 @@ from django.urls import path, include
 from rest_framework.authtoken import views
 from . import views as api_views
 from .views_auth import CustomAuthToken
+from .views_email_campaigns import (
+    SegmentViewSet, CampaignABTestViewSet, DripCampaignViewSet,
+    DripCampaignStepViewSet, AnalyticsViewSet, AIFeaturesViewSet,
+    TemplateToolsViewSet
+)
 from integrations.webhooks import views as webhook_views
 from integrations.plugins import webhook_views as plugin_webhook_views
 
@@ -115,4 +120,58 @@ urlpatterns = [
     path('webhooks/plugins/meta-ads/<int:plugin_id>/', plugin_webhook_views.meta_ads_webhook, name='webhook-meta-ads'),
     path('webhooks/plugins/tiktok-ads/<int:plugin_id>/', plugin_webhook_views.tiktok_ads_webhook, name='webhook-tiktok-ads'),
     path('webhooks/plugins/shopify/<int:plugin_id>/', plugin_webhook_views.shopify_webhook, name='webhook-shopify'),
+
+    # Enhanced Email Campaign Features
+    # Segments
+    path('segments/', SegmentViewSet.as_view({'get': 'list', 'post': 'create'}), name='segments-list'),
+    path('segments/<int:pk>/', SegmentViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='segments-detail'),
+    path('segments/<int:pk>/preview/', SegmentViewSet.as_view({'get': 'preview'}), name='segments-preview'),
+    path('segments/<int:pk>/calculate-size/', SegmentViewSet.as_view({'post': 'calculate_size'}), name='segments-calculate-size'),
+    path('segments/<int:pk>/performance/', SegmentViewSet.as_view({'get': 'performance'}), name='segments-performance'),
+    path('segments/validate-conditions/', SegmentViewSet.as_view({'post': 'validate_conditions'}), name='segments-validate-conditions'),
+
+    # A/B Tests
+    path('ab-tests/', CampaignABTestViewSet.as_view({'get': 'list', 'post': 'create'}), name='ab-tests-list'),
+    path('ab-tests/<int:pk>/', CampaignABTestViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='ab-tests-detail'),
+    path('ab-tests/<int:pk>/results/', CampaignABTestViewSet.as_view({'get': 'results'}), name='ab-tests-results'),
+    path('ab-tests/<int:pk>/select-winner/', CampaignABTestViewSet.as_view({'post': 'select_winner'}), name='ab-tests-select-winner'),
+
+    # Drip Campaigns
+    path('drip-campaigns/', DripCampaignViewSet.as_view({'get': 'list', 'post': 'create'}), name='drip-campaigns-list'),
+    path('drip-campaigns/<int:pk>/', DripCampaignViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='drip-campaigns-detail'),
+    path('drip-campaigns/<int:pk>/activate/', DripCampaignViewSet.as_view({'post': 'activate'}), name='drip-campaigns-activate'),
+    path('drip-campaigns/<int:pk>/pause/', DripCampaignViewSet.as_view({'post': 'pause'}), name='drip-campaigns-pause'),
+    path('drip-campaigns/<int:pk>/enroll-contact/', DripCampaignViewSet.as_view({'post': 'enroll_contact'}), name='drip-campaigns-enroll'),
+    path('drip-campaigns/<int:pk>/analytics/', DripCampaignViewSet.as_view({'get': 'analytics'}), name='drip-campaigns-analytics'),
+    path('drip-campaigns/<int:pk>/enrollments/', DripCampaignViewSet.as_view({'get': 'enrollments'}), name='drip-campaigns-enrollments'),
+
+    # Drip Campaign Steps
+    path('drip-campaign-steps/', DripCampaignStepViewSet.as_view({'get': 'list', 'post': 'create'}), name='drip-steps-list'),
+    path('drip-campaign-steps/<int:pk>/', DripCampaignStepViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='drip-steps-detail'),
+    path('drip-campaign-steps/reorder/', DripCampaignStepViewSet.as_view({'post': 'reorder'}), name='drip-steps-reorder'),
+
+    # Analytics
+    path('email-analytics/campaign-overview/', AnalyticsViewSet.as_view({'get': 'campaign_overview'}), name='analytics-campaign-overview'),
+    path('email-analytics/compare-campaigns/', AnalyticsViewSet.as_view({'post': 'compare_campaigns'}), name='analytics-compare-campaigns'),
+    path('email-analytics/global-stats/', AnalyticsViewSet.as_view({'get': 'global_stats'}), name='analytics-global-stats'),
+    path('email-analytics/contact-engagement/', AnalyticsViewSet.as_view({'get': 'contact_engagement'}), name='analytics-contact-engagement'),
+    path('email-analytics/revenue-attribution/', AnalyticsViewSet.as_view({'get': 'revenue_attribution'}), name='analytics-revenue-attribution'),
+    path('email-analytics/provider-performance/', AnalyticsViewSet.as_view({'get': 'provider_performance'}), name='analytics-provider-performance'),
+
+    # AI Features
+    path('email-ai/optimize-subject/', AIFeaturesViewSet.as_view({'post': 'optimize_subject'}), name='ai-optimize-subject'),
+    path('email-ai/improve-content/', AIFeaturesViewSet.as_view({'post': 'improve_content'}), name='ai-improve-content'),
+    path('email-ai/personalize-content/', AIFeaturesViewSet.as_view({'post': 'personalize_content'}), name='ai-personalize-content'),
+    path('email-ai/predict-send-time/', AIFeaturesViewSet.as_view({'post': 'predict_send_time'}), name='ai-predict-send-time'),
+    path('email-ai/generate-ab-variants/', AIFeaturesViewSet.as_view({'post': 'generate_ab_variants'}), name='ai-generate-ab-variants'),
+    path('email-ai/analyze-performance/', AIFeaturesViewSet.as_view({'post': 'analyze_performance'}), name='ai-analyze-performance'),
+    path('email-ai/suggest-segments/', AIFeaturesViewSet.as_view({'post': 'suggest_segments'}), name='ai-suggest-segments'),
+    path('email-ai/generate-drip-sequence/', AIFeaturesViewSet.as_view({'post': 'generate_drip_sequence'}), name='ai-generate-drip-sequence'),
+    path('email-ai/predict-unsubscribe-risk/', AIFeaturesViewSet.as_view({'post': 'predict_unsubscribe_risk'}), name='ai-predict-unsubscribe-risk'),
+    path('email-ai/calculate-spam-score/', AIFeaturesViewSet.as_view({'post': 'calculate_spam_score'}), name='ai-calculate-spam-score'),
+
+    # Template Tools
+    path('template-tools/validate/', TemplateToolsViewSet.as_view({'post': 'validate'}), name='template-tools-validate'),
+    path('template-tools/preview/', TemplateToolsViewSet.as_view({'post': 'preview'}), name='template-tools-preview'),
+    path('template-tools/extract-variables/', TemplateToolsViewSet.as_view({'post': 'extract_variables'}), name='template-tools-extract-variables'),
 ]
