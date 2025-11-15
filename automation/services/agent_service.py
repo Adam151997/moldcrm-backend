@@ -282,8 +282,7 @@ Always maintain a professional, helpful tone.
                 return {
                     'success': True,
                     'response': final_text,
-                    'function_calls': function_calls_made,
-                    'conversation_history': chat.history
+                    'function_calls': function_calls_made
                 }
 
             # Max iterations reached
