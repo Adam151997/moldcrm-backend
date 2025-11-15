@@ -3,6 +3,7 @@ AI Agent Service - Handles multi-turn conversations with function calling
 Uses Gemini 2.5 Flash with function calling to enable conversational CRM interactions
 """
 from google import genai
+from google.genai import types
 from django.conf import settings
 from typing import Dict, Any, List, Optional
 import json
@@ -67,18 +68,20 @@ Always maintain a professional, helpful tone.
         """
         try:
             # Create chat configuration with function calling support
-            chat_config = {
-                'model': self.model_name,
-                'tools': self.tools,
-                'system_instruction': self.system_instruction
-            }
+            # Disable automatic function calling since we need to inject account_id/user_id
+            config = types.GenerateContentConfig(
+                tools=self.tools,
+                system_instruction=self.system_instruction,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+            )
 
-            # Initialize chat with history if provided
-            if conversation_history:
-                chat_config['history'] = conversation_history
+            # Create chat session with tools and system instruction
+            chat = self.client.chats.create(
+                model=self.model_name,
+                config=config
+            )
 
-            # Create chat session and send query
-            chat = self.client.chats.create(**chat_config)
+            # Send the user's query
             response = chat.send_message(query)
 
             # Track function calls made
@@ -89,51 +92,44 @@ Always maintain a professional, helpful tone.
             # Multi-turn execution loop
             while iteration < max_iterations:
                 # Check if model wants to call a function
-                if response.candidates[0].content.parts:
-                    part = response.candidates[0].content.parts[0]
+                if response.function_calls:
+                    # Get the first function call
+                    function_call = response.function_calls[0]
+                    function_name = function_call.name
+                    function_args = dict(function_call.args)
 
-                    # Check for function call
-                    if hasattr(part, 'function_call') and part.function_call:
-                        function_call = part.function_call
-                        function_name = function_call.name
-                        function_args = dict(function_call.args)
+                    # Add account_id and user_id to function arguments
+                    function_args['account_id'] = account_id
+                    if function_name in ['create_lead', 'create_deal']:
+                        function_args['user_id'] = user_id
 
-                        # Add account_id and user_id to function arguments
-                        function_args['account_id'] = account_id
-                        if function_name in ['create_lead', 'create_deal']:
-                            function_args['user_id'] = user_id
+                    # Execute the function
+                    tool_function = ai_tools.get_tool_by_name(function_name)
+                    if tool_function:
+                        function_result = tool_function(**function_args)
 
-                        # Execute the function
-                        tool_function = ai_tools.get_tool_by_name(function_name)
-                        if tool_function:
-                            function_result = tool_function(**function_args)
+                        # Track the call
+                        function_calls_made.append({
+                            'function': function_name,
+                            'arguments': function_args,
+                            'result': function_result
+                        })
 
-                            # Track the call
-                            function_calls_made.append({
-                                'function': function_name,
-                                'arguments': function_args,
-                                'result': function_result
-                            })
-
-                            # Send the function result back to the model
-                            function_response_content = {
-                                'parts': [{
-                                    'function_response': {
-                                        'name': function_name,
-                                        'response': {'result': function_result}
-                                    }
-                                }]
-                            }
-                            response = chat.send_message(function_response_content)
-                            iteration += 1
-                            continue
-                        else:
-                            # Function not found
-                            return {
-                                'success': False,
-                                'response': f"Error: Function '{function_name}' not available",
-                                'function_calls': function_calls_made
-                            }
+                        # Send the function result back to the model
+                        function_response_part = types.Part.from_function_response(
+                            name=function_name,
+                            response={'result': function_result}
+                        )
+                        response = chat.send_message(function_response_part)
+                        iteration += 1
+                        continue
+                    else:
+                        # Function not found
+                        return {
+                            'success': False,
+                            'response': f"Error: Function '{function_name}' not available",
+                            'function_calls': function_calls_made
+                        }
 
                 # No more function calls - return the final text response
                 final_text = response.text if hasattr(response, 'text') else "I processed your request."
