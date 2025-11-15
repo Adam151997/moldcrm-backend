@@ -3,7 +3,9 @@ from crm.models import Lead, Contact, Deal, PipelineStage
 from custom_objects.models import CustomObject, CustomField, CustomObjectRecord
 from templates.models import BusinessTemplate, AppliedTemplate
 from automation.models import Workflow, WorkflowExecution, AIInsight
-from integrations.models import EmailTemplate, EmailCampaign, Email, EmailProvider, Webhook, WebhookLog, ExternalIntegration
+from integrations.models import (EmailTemplate, EmailCampaign, Email, EmailProvider,
+                                Webhook, WebhookLog, ExternalIntegration,
+                                Plugin, PluginEvent, PluginSyncLog)
 from users.models import User
 
 class UserSerializer(serializers.ModelSerializer):
@@ -219,3 +221,117 @@ class EmailProviderSerializer(serializers.ModelSerializer):
             validated_data['api_secret'] = encrypt_api_key(validated_data['api_secret'])
 
         return super().update(instance, validated_data)
+
+
+# Plugin Integration Serializers
+class PluginSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    plugin_display = serializers.CharField(source='get_plugin_type_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    masked_client_secret = serializers.CharField(source='get_masked_client_secret', read_only=True)
+    masked_access_token = serializers.CharField(source='get_masked_access_token', read_only=True)
+    is_token_expired_flag = serializers.BooleanField(source='is_token_expired', read_only=True)
+
+    class Meta:
+        model = Plugin
+        fields = [
+            'id', 'plugin_type', 'plugin_display', 'name', 'category', 'category_display',
+            'status', 'status_display', 'is_active', 'is_verified',
+            'config', 'webhook_url', 'webhook_secret',
+            'last_sync_at', 'sync_frequency', 'last_error', 'error_count',
+            'total_syncs', 'failed_syncs', 'token_expires_at', 'is_token_expired_flag',
+            'masked_client_secret', 'masked_access_token',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'created_by', 'created_by_name', 'created_at', 'updated_at', 'account',
+            'is_verified', 'last_sync_at', 'last_error', 'error_count',
+            'total_syncs', 'failed_syncs', 'token_expires_at',
+            'plugin_display', 'category_display', 'status_display',
+            'masked_client_secret', 'masked_access_token', 'is_token_expired_flag'
+        ]
+        extra_kwargs = {
+            'client_id': {'write_only': True},
+            'client_secret': {'write_only': True},
+            'access_token': {'write_only': True},
+            'refresh_token': {'write_only': True},
+        }
+
+    def create(self, validated_data):
+        from integrations.services.encryption import encrypt_value
+
+        # Encrypt credentials before saving
+        if 'client_id' in validated_data and validated_data['client_id']:
+            validated_data['client_id'] = encrypt_value(validated_data['client_id'])
+
+        if 'client_secret' in validated_data and validated_data['client_secret']:
+            validated_data['client_secret'] = encrypt_value(validated_data['client_secret'])
+
+        if 'access_token' in validated_data and validated_data.get('access_token'):
+            validated_data['access_token'] = encrypt_value(validated_data['access_token'])
+
+        if 'refresh_token' in validated_data and validated_data.get('refresh_token'):
+            validated_data['refresh_token'] = encrypt_value(validated_data['refresh_token'])
+
+        # Set category based on plugin type
+        plugin_type = validated_data.get('plugin_type')
+        if plugin_type in ['google_ads', 'meta_ads', 'tiktok_ads']:
+            validated_data['category'] = 'advertising'
+        elif plugin_type == 'shopify':
+            validated_data['category'] = 'ecommerce'
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from integrations.services.encryption import encrypt_value
+
+        # Encrypt credentials before saving if they were updated
+        if 'client_id' in validated_data and validated_data['client_id']:
+            validated_data['client_id'] = encrypt_value(validated_data['client_id'])
+
+        if 'client_secret' in validated_data and validated_data['client_secret']:
+            validated_data['client_secret'] = encrypt_value(validated_data['client_secret'])
+
+        if 'access_token' in validated_data and validated_data.get('access_token'):
+            validated_data['access_token'] = encrypt_value(validated_data['access_token'])
+
+        if 'refresh_token' in validated_data and validated_data.get('refresh_token'):
+            validated_data['refresh_token'] = encrypt_value(validated_data['refresh_token'])
+
+        return super().update(instance, validated_data)
+
+
+class PluginEventSerializer(serializers.ModelSerializer):
+    plugin_name = serializers.CharField(source='plugin.name', read_only=True)
+    plugin_type = serializers.CharField(source='plugin.plugin_type', read_only=True)
+    event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = PluginEvent
+        fields = [
+            'id', 'plugin', 'plugin_name', 'plugin_type',
+            'event_type', 'event_type_display', 'event_id',
+            'payload', 'processed_data', 'status', 'status_display',
+            'error_message', 'lead', 'contact', 'deal',
+            'processed_at', 'created_at'
+        ]
+        read_only_fields = ['created_at', 'processed_at']
+
+
+class PluginSyncLogSerializer(serializers.ModelSerializer):
+    plugin_name = serializers.CharField(source='plugin.name', read_only=True)
+    plugin_type = serializers.CharField(source='plugin.plugin_type', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = PluginSyncLog
+        fields = [
+            'id', 'plugin', 'plugin_name', 'plugin_type',
+            'sync_type', 'status', 'status_display',
+            'records_fetched', 'records_created', 'records_updated', 'records_failed',
+            'details', 'error_message',
+            'started_at', 'completed_at', 'duration_seconds'
+        ]
+        read_only_fields = ['started_at', 'completed_at', 'duration_seconds']

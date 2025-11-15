@@ -3,6 +3,7 @@ from rest_framework.authtoken import views
 from . import views as api_views
 from .views_auth import CustomAuthToken
 from integrations.webhooks import views as webhook_views
+from integrations.plugins import webhook_views as plugin_webhook_views
 
 urlpatterns = [
     # Authentication - USE CUSTOM AUTH
@@ -89,4 +90,29 @@ urlpatterns = [
     path('webhooks/email/brevo/', webhook_views.BrevoWebhookView.as_view(), name='webhook-brevo'),
     path('webhooks/email/mailchimp/', webhook_views.MailchimpWebhookView.as_view(), name='webhook-mailchimp'),
     path('webhooks/email/klaviyo/', webhook_views.KlaviyoWebhookView.as_view(), name='webhook-klaviyo'),
+
+    # Plugin Integration Endpoints
+    path('plugins/', api_views.PluginViewSet.as_view({'get': 'list', 'post': 'create'}), name='plugins-list'),
+    path('plugins/<int:pk>/', api_views.PluginViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='plugins-detail'),
+    path('plugins/<int:pk>/oauth-url/', api_views.PluginViewSet.as_view({'get': 'oauth_url'}), name='plugins-oauth-url'),
+    path('plugins/<int:pk>/oauth-callback/', api_views.PluginViewSet.as_view({'post': 'oauth_callback'}), name='plugins-oauth-callback'),
+    path('plugins/<int:pk>/verify/', api_views.PluginViewSet.as_view({'post': 'verify'}), name='plugins-verify'),
+    path('plugins/<int:pk>/sync/', api_views.PluginViewSet.as_view({'post': 'sync'}), name='plugins-sync'),
+    path('plugins/<int:pk>/account-info/', api_views.PluginViewSet.as_view({'get': 'account_info'}), name='plugins-account-info'),
+    path('plugins/<int:pk>/refresh-token/', api_views.PluginViewSet.as_view({'post': 'refresh_token'}), name='plugins-refresh-token'),
+    path('plugins/<int:pk>/toggle-active/', api_views.PluginViewSet.as_view({'post': 'toggle_active'}), name='plugins-toggle-active'),
+
+    # Plugin Events
+    path('plugin-events/', api_views.PluginEventViewSet.as_view({'get': 'list'}), name='plugin-events-list'),
+    path('plugin-events/<int:pk>/', api_views.PluginEventViewSet.as_view({'get': 'retrieve'}), name='plugin-events-detail'),
+
+    # Plugin Sync Logs
+    path('plugin-sync-logs/', api_views.PluginSyncLogViewSet.as_view({'get': 'list'}), name='plugin-sync-logs-list'),
+    path('plugin-sync-logs/<int:pk>/', api_views.PluginSyncLogViewSet.as_view({'get': 'retrieve'}), name='plugin-sync-logs-detail'),
+
+    # Plugin Webhooks (no authentication required)
+    path('webhooks/plugins/google-ads/<int:plugin_id>/', plugin_webhook_views.google_ads_webhook, name='webhook-google-ads'),
+    path('webhooks/plugins/meta-ads/<int:plugin_id>/', plugin_webhook_views.meta_ads_webhook, name='webhook-meta-ads'),
+    path('webhooks/plugins/tiktok-ads/<int:plugin_id>/', plugin_webhook_views.tiktok_ads_webhook, name='webhook-tiktok-ads'),
+    path('webhooks/plugins/shopify/<int:plugin_id>/', plugin_webhook_views.shopify_webhook, name='webhook-shopify'),
 ]
