@@ -217,7 +217,10 @@ Always maintain a professional, helpful tone.
             config = types.GenerateContentConfig(
                 tools=self.tools,
                 system_instruction=self.system_instruction,
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True,
+                    maximum_remote_calls=0  # Must be 0 when disabled to avoid conflicts
+                )
             )
 
             # Create chat session with tools and system instruction
