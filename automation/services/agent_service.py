@@ -28,7 +28,7 @@ class AgentService:
 
         # Initialize model with function calling support (Gemini 2.5)
         self.model_name = 'gemini-2.5-flash'
-        self.tools = list(ai_tools.AVAILABLE_TOOLS.values())
+        self.tools = self._create_function_declarations()
 
         # System instruction for the agent
         self.system_instruction = """
@@ -51,6 +51,151 @@ Available capabilities:
 
 Always maintain a professional, helpful tone.
 """
+
+    def _create_function_declarations(self):
+        """
+        Create function declarations for the Gemini API.
+        Note: Default values are NOT included as they're not supported by Gemini API.
+        """
+        function_declarations = [
+            types.FunctionDeclaration(
+                name='get_lead',
+                description='Retrieve detailed information about a specific lead',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'lead_id': {'type': 'integer', 'description': 'The unique identifier of the lead'},
+                    },
+                    'required': ['lead_id']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='get_deal',
+                description='Retrieve detailed information about a specific deal',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'deal_id': {'type': 'integer', 'description': 'The unique identifier of the deal'},
+                    },
+                    'required': ['deal_id']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='get_contact',
+                description='Retrieve detailed information about a specific contact',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'contact_id': {'type': 'integer', 'description': 'The unique identifier of the contact'},
+                    },
+                    'required': ['contact_id']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='create_lead',
+                description='Create a new lead in the CRM system',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'first_name': {'type': 'string', 'description': "Lead's first name"},
+                        'last_name': {'type': 'string', 'description': "Lead's last name"},
+                        'email': {'type': 'string', 'description': "Lead's email address"},
+                        'company': {'type': 'string', 'description': "Lead's company name (optional)"},
+                        'phone': {'type': 'string', 'description': "Lead's phone number (optional)"},
+                        'source': {'type': 'string', 'description': 'How the lead was acquired (optional)'},
+                        'notes': {'type': 'string', 'description': 'Additional notes about the lead (optional)'},
+                    },
+                    'required': ['first_name', 'last_name', 'email']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='create_deal',
+                description='Create a new deal in the CRM system',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'name': {'type': 'string', 'description': 'Deal name/title'},
+                        'contact_id': {'type': 'integer', 'description': 'ID of the contact associated with this deal'},
+                        'amount': {'type': 'number', 'description': 'Deal amount in dollars (optional)'},
+                        'probability': {'type': 'integer', 'description': 'Probability of closing 0-100 (optional)'},
+                        'expected_close_date': {'type': 'string', 'description': 'Expected close date in ISO format YYYY-MM-DD (optional)'},
+                        'notes': {'type': 'string', 'description': 'Additional notes about the deal (optional)'},
+                    },
+                    'required': ['name', 'contact_id']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='update_lead_status',
+                description='Update the status of an existing lead',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'lead_id': {'type': 'integer', 'description': 'The unique identifier of the lead to update'},
+                        'new_status': {'type': 'string', 'description': "New status value (must be one of: 'new', 'contacted', 'qualified', 'unqualified')"},
+                    },
+                    'required': ['lead_id', 'new_status']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='update_deal_stage',
+                description='Update the stage of an existing deal',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'deal_id': {'type': 'integer', 'description': 'The unique identifier of the deal to update'},
+                        'new_stage': {'type': 'string', 'description': "New stage value (must be one of: 'prospect', 'qualification', 'proposal', 'negotiation', 'closed_won', 'closed_lost')"},
+                    },
+                    'required': ['deal_id', 'new_stage']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='get_pipeline_summary',
+                description='Get a comprehensive summary of the sales pipeline including deal counts and values by stage',
+                parameters={
+                    'type': 'object',
+                    'properties': {},
+                    'required': []
+                }
+            ),
+            types.FunctionDeclaration(
+                name='get_leads_summary',
+                description='Get a summary of leads with optional filtering by status',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'status_filter': {'type': 'string', 'description': "Optional status to filter by ('new', 'contacted', 'qualified', 'unqualified')"},
+                    },
+                    'required': []
+                }
+            ),
+            types.FunctionDeclaration(
+                name='search_leads',
+                description='Search for leads by name, email, or company',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'query': {'type': 'string', 'description': 'Search query string'},
+                        'limit': {'type': 'integer', 'description': 'Maximum number of results to return'},
+                    },
+                    'required': ['query']
+                }
+            ),
+            types.FunctionDeclaration(
+                name='search_deals',
+                description='Search for deals by name or contact information',
+                parameters={
+                    'type': 'object',
+                    'properties': {
+                        'query': {'type': 'string', 'description': 'Search query string'},
+                        'limit': {'type': 'integer', 'description': 'Maximum number of results to return'},
+                    },
+                    'required': ['query']
+                }
+            ),
+        ]
+
+        # Wrap declarations in a Tool
+        return [types.Tool(function_declarations=function_declarations)]
 
     def process_query(self, query: str, account_id: int, user_id: int,
                      conversation_history: Optional[List] = None) -> Dict[str, Any]:
