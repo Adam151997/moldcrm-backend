@@ -599,7 +599,7 @@ class AIAgentViewSet(viewsets.ViewSet):
                     account=request.user.account,
                     insight_type=insight_type,
                     title=f"Agent Query: {query[:100]}",
-                    content=result.get('response', ''),
+                    content=result.get('response') or 'Processing...',  # Ensure never None
                     confidence_score=1.0 if result.get('success') else 0.0,
                     metadata={
                         'query': query,
