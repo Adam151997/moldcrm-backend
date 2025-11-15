@@ -71,14 +71,21 @@ class WorkflowExecution(models.Model):
 
 class AIInsight(models.Model):
     """
-    AI-generated insights using Gemini API
+    AI-generated insights using Gemini API.
+    Now also logs AI Agent conversational interactions.
     """
     INSIGHT_TYPES = [
+        # Legacy types (DEPRECATED - from old AI Insights)
         ('lead_score', 'Lead Scoring'),
         ('deal_prediction', 'Deal Prediction'),
         ('sentiment', 'Sentiment Analysis'),
         ('suggestion', 'Smart Suggestion'),
         ('summary', 'Summary'),
+        # New agent interaction types
+        ('agent_query', 'Agent Query'),
+        ('agent_lead', 'Agent Lead Action'),
+        ('agent_deal', 'Agent Deal Action'),
+        ('agent_report', 'Agent Report'),
     ]
 
     account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='ai_insights')

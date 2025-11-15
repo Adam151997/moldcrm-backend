@@ -419,7 +419,13 @@ class WorkflowViewSet(viewsets.ModelViewSet):
 
 
 class AIInsightViewSet(viewsets.ModelViewSet):
-    """ViewSet for AI insights"""
+    """
+    ViewSet for AI insights.
+
+    DEPRECATED: This endpoint is deprecated and will be removed in a future version.
+    Please use the new AI Agent endpoint at /api/v1/ai-agent/query/ instead.
+    The AI Agent provides a more flexible conversational interface with the same capabilities.
+    """
     from .serializers import AIInsightSerializer
     serializer_class = AIInsightSerializer
     permission_classes = [permissions.IsAuthenticated, IsAccountUser]
@@ -430,11 +436,16 @@ class AIInsightViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def generate_lead_score(self, request):
-        """Generate AI lead score"""
+        """
+        Generate AI lead score.
+
+        DEPRECATED: Use /api/v1/ai-agent/query/ with a natural language query instead.
+        Example: POST {"query": "Score lead #123"}
+        """
         from automation.services import GeminiAIService
         from automation.models import AIInsight
         from crm.models import Lead
-        
+
         lead_id = request.data.get('lead_id')
         try:
             lead = Lead.objects.get(id=lead_id, account=request.user.account)
@@ -446,10 +457,10 @@ class AIInsightViewSet(viewsets.ModelViewSet):
                 'source': lead.source,
                 'notes': lead.notes,
             }
-            
+
             ai_service = GeminiAIService()
             result = ai_service.generate_lead_score(lead_data)
-            
+
             # Create insight record
             insight = AIInsight.objects.create(
                 account=request.user.account,
@@ -458,12 +469,18 @@ class AIInsightViewSet(viewsets.ModelViewSet):
                 title=f"Lead Score: {result.get('score', 0)}/100",
                 content=result.get('reasoning', ''),
                 confidence_score=result.get('score', 0) / 100,
-                metadata={'recommendations': result.get('recommendations', [])}
+                metadata={
+                    'recommendations': result.get('recommendations', []),
+                    'deprecated_warning': 'This endpoint is deprecated. Use /api/v1/ai-agent/query/ instead.'
+                }
             )
-            
+
             from .serializers import AIInsightSerializer
             serializer = AIInsightSerializer(insight)
-            return Response(serializer.data)
+            response_data = serializer.data
+            response_data['_deprecated'] = True
+            response_data['_migration_note'] = 'Please migrate to /api/v1/ai-agent/query/ for better AI capabilities'
+            return Response(response_data)
         except Lead.DoesNotExist:
             return Response({'error': 'Lead not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
@@ -471,11 +488,16 @@ class AIInsightViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def generate_deal_prediction(self, request):
-        """Generate AI deal prediction"""
+        """
+        Generate AI deal prediction.
+
+        DEPRECATED: Use /api/v1/ai-agent/query/ with a natural language query instead.
+        Example: POST {"query": "What's the likelihood of deal #456 closing?"}
+        """
         from automation.services import GeminiAIService
         from automation.models import AIInsight
         from crm.models import Deal
-        
+
         deal_id = request.data.get('deal_id')
         try:
             deal = Deal.objects.get(id=deal_id, account=request.user.account)
@@ -487,10 +509,10 @@ class AIInsightViewSet(viewsets.ModelViewSet):
                 'probability': deal.probability,
                 'contact_name': deal.contact.__str__() if deal.contact else 'Unknown',
             }
-            
+
             ai_service = GeminiAIService()
             result = ai_service.predict_deal_outcome(deal_data)
-            
+
             # Create insight record
             insight = AIInsight.objects.create(
                 account=request.user.account,
@@ -501,17 +523,142 @@ class AIInsightViewSet(viewsets.ModelViewSet):
                 confidence_score=result.get('probability', 0) / 100,
                 metadata={
                     'insights': result.get('insights', []),
-                    'risk_factors': result.get('risk_factors', [])
+                    'risk_factors': result.get('risk_factors', []),
+                    'deprecated_warning': 'This endpoint is deprecated. Use /api/v1/ai-agent/query/ instead.'
                 }
             )
-            
+
             from .serializers import AIInsightSerializer
             serializer = AIInsightSerializer(insight)
-            return Response(serializer.data)
+            response_data = serializer.data
+            response_data['_deprecated'] = True
+            response_data['_migration_note'] = 'Please migrate to /api/v1/ai-agent/query/ for better AI capabilities'
+            return Response(response_data)
         except Deal.DoesNotExist:
             return Response({'error': 'Deal not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AIAgentViewSet(viewsets.ViewSet):
+    """
+    AI Agent for conversational CRM interactions.
+    Replaces the old AI Insights system with a natural language interface.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    @action(detail=False, methods=['post'])
+    def query(self, request):
+        """
+        Process a natural language query with the AI Agent.
+
+        Request body:
+        {
+            "query": "Show me my pipeline summary",
+            "conversation_history": []  // Optional for multi-turn conversations
+        }
+        """
+        from automation.services.agent_service import AgentService
+        from automation.models import AIInsight
+
+        query = request.data.get('query')
+        conversation_history = request.data.get('conversation_history', [])
+
+        if not query:
+            return Response(
+                {'error': 'Query is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Initialize agent and process query
+            agent = AgentService()
+            result = agent.process_query(
+                query=query,
+                account_id=request.user.account.id,
+                user_id=request.user.id,
+                conversation_history=conversation_history
+            )
+
+            # Log the interaction for audit trail
+            if result.get('success'):
+                # Determine insight type based on function calls
+                function_calls = result.get('function_calls', [])
+                insight_type = 'agent_query'
+
+                if function_calls:
+                    first_call = function_calls[0]['function']
+                    if 'lead' in first_call:
+                        insight_type = 'agent_lead'
+                    elif 'deal' in first_call:
+                        insight_type = 'agent_deal'
+                    elif 'pipeline' in first_call:
+                        insight_type = 'agent_report'
+
+                AIInsight.objects.create(
+                    account=request.user.account,
+                    insight_type=insight_type,
+                    title=f"Agent Query: {query[:100]}",
+                    content=result.get('response', ''),
+                    confidence_score=1.0 if result.get('success') else 0.0,
+                    metadata={
+                        'query': query,
+                        'function_calls': function_calls,
+                        'conversation_turn': len(conversation_history) // 2 + 1
+                    }
+                )
+
+            return Response(result)
+
+        except Exception as e:
+            return Response(
+                {
+                    'success': False,
+                    'response': f'An error occurred: {str(e)}',
+                    'error': str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def suggestions(self, request):
+        """
+        Get contextual suggestions for what the user might want to do next.
+
+        Request body:
+        {
+            "context": {
+                "recent_action": "viewed_pipeline",
+                "current_view": "dashboard"
+            }
+        }
+        """
+        from automation.services.agent_service import AgentService
+
+        context = request.data.get('context', {})
+
+        try:
+            agent = AgentService()
+            suggestions = agent.generate_suggestions(context)
+
+            return Response({
+                'success': True,
+                'suggestions': suggestions
+            })
+
+        except Exception as e:
+            return Response(
+                {
+                    'success': False,
+                    'suggestions': [
+                        "Show me my pipeline summary",
+                        "What are my newest leads?",
+                        "Create a new lead"
+                    ],
+                    'error': str(e)
+                },
+                status=status.HTTP_200_OK  # Still return suggestions on error
+            )
 
 
 # ========================================
