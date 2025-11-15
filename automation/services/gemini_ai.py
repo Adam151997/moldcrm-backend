@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 from django.conf import settings
 from typing import Dict, Any, Optional, List
 import json
@@ -9,11 +9,11 @@ class GeminiAIService:
     Service for interacting with Google's Gemini AI API
     API Key: AIzaSyDh5utXAp2887iHPCaAzyJ0JHAfxZPJTeA
     """
-    
+
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or getattr(settings, 'GEMINI_API_KEY', 'AIzaSyDh5utXAp2887iHPCaAzyJ0JHAfxZPJTeA')
-        genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.client = genai.Client(api_key=self.api_key)
+        self.model_name = 'gemini-2.5-flash'
     
     def generate_lead_score(self, lead_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -39,7 +39,10 @@ class GeminiAIService:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             result = self._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -75,7 +78,10 @@ class GeminiAIService:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             result = self._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -105,7 +111,10 @@ class GeminiAIService:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             result = self._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -132,7 +141,10 @@ class GeminiAIService:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             return response.text
         except Exception as e:
             return f"Unable to generate email: {str(e)}"
@@ -163,7 +175,10 @@ class GeminiAIService:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             return response.text
         except Exception as e:
             return f"Unable to generate summary: {str(e)}"
@@ -182,7 +197,10 @@ class GeminiAIService:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             result = self._parse_json_response(response.text)
             if isinstance(result, list):
                 return result

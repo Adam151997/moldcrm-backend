@@ -1,8 +1,8 @@
 """
 AI Agent Service - Handles multi-turn conversations with function calling
-Uses Gemini 1.5 Flash with function calling to enable conversational CRM interactions
+Uses Gemini 2.5 Flash with function calling to enable conversational CRM interactions
 """
-import google.generativeai as genai
+from google import genai
 from django.conf import settings
 from typing import Dict, Any, List, Optional
 import json
@@ -23,13 +23,11 @@ class AgentService:
             api_key: Optional Gemini API key (uses settings if not provided)
         """
         self.api_key = api_key or getattr(settings, 'GEMINI_API_KEY', 'AIzaSyDh5utXAp2887iHPCaAzyJ0JHAfxZPJTeA')
-        genai.configure(api_key=self.api_key)
+        self.client = genai.Client(api_key=self.api_key)
 
-        # Initialize model with function calling support (Gemini 1.5)
-        self.model = genai.GenerativeModel(
-            'gemini-1.5-flash',
-            tools=list(ai_tools.AVAILABLE_TOOLS.values())
-        )
+        # Initialize model with function calling support (Gemini 2.5)
+        self.model_name = 'gemini-2.5-flash'
+        self.tools = list(ai_tools.AVAILABLE_TOOLS.values())
 
         # System instruction for the agent
         self.system_instruction = """
@@ -68,13 +66,19 @@ Always maintain a professional, helpful tone.
             Dictionary containing the agent's response and execution details
         """
         try:
-            # Initialize or continue chat session
-            if conversation_history:
-                chat = self.model.start_chat(history=conversation_history)
-            else:
-                chat = self.model.start_chat()
+            # Create chat configuration with function calling support
+            chat_config = {
+                'model': self.model_name,
+                'tools': self.tools,
+                'system_instruction': self.system_instruction
+            }
 
-            # Send the user's query
+            # Initialize chat with history if provided
+            if conversation_history:
+                chat_config['history'] = conversation_history
+
+            # Create chat session and send query
+            chat = self.client.chats.create(**chat_config)
             response = chat.send_message(query)
 
             # Track function calls made
@@ -112,16 +116,15 @@ Always maintain a professional, helpful tone.
                             })
 
                             # Send the function result back to the model
-                            response = chat.send_message(
-                                genai.protos.Content(
-                                    parts=[genai.protos.Part(
-                                        function_response=genai.protos.FunctionResponse(
-                                            name=function_name,
-                                            response={'result': function_result}
-                                        )
-                                    )]
-                                )
-                            )
+                            function_response_content = {
+                                'parts': [{
+                                    'function_response': {
+                                        'name': function_name,
+                                        'response': {'result': function_result}
+                                    }
+                                }]
+                            }
+                            response = chat.send_message(function_response_content)
                             iteration += 1
                             continue
                         else:
@@ -176,8 +179,10 @@ Provide 3 short, actionable suggestions (e.g., "Show me my pipeline summary", "C
 Return as a JSON array of strings.
 """
             # Use simple generation for suggestions (no function calling needed)
-            simple_model = genai.GenerativeModel('gemini-1.5-flash')
-            response = simple_model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
 
             # Parse suggestions
             text = response.text.strip()
