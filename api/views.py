@@ -9,7 +9,8 @@ from custom_objects.models import CustomObject, CustomField, CustomObjectRecord
 from .serializers import (
     LeadSerializer, ContactSerializer, DealSerializer, UserSerializer,
     PipelineStageSerializer, CustomFieldSerializer, CustomObjectSerializer,
-    CustomObjectRecordSerializer
+    CustomObjectRecordSerializer, PluginSerializer, PluginEventSerializer,
+    PluginSyncLogSerializer
 )
 
 class IsAccountUser(permissions.BasePermission):
@@ -682,3 +683,210 @@ class EmailProviderViewSet(viewsets.ModelViewSet):
             'success': True,
             'is_active': provider.is_active
         }, status=status.HTTP_200_OK)
+
+
+class PluginViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing plugin integrations (Google Ads, Meta Ads, TikTok Ads, Shopify)"""
+    serializer_class = PluginSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import Plugin
+        return Plugin.objects.filter(account=self.request.user.account)
+
+    def perform_create(self, serializer):
+        serializer.save(
+            account=self.request.user.account,
+            created_by=self.request.user
+        )
+
+    @action(detail=True, methods=['get'])
+    def oauth_url(self, request, pk=None):
+        """Get OAuth authorization URL for plugin"""
+        from integrations.plugins.plugin_service import PluginService
+        import secrets
+
+        plugin = self.get_object()
+
+        # Generate state for CSRF protection
+        state = secrets.token_urlsafe(32)
+        request.session[f'oauth_state_{plugin.id}'] = state
+
+        # Get redirect URI from request or use default
+        redirect_uri = request.query_params.get('redirect_uri', request.build_absolute_uri('/api/plugins/oauth/callback/'))
+
+        try:
+            oauth_url = PluginService.initiate_oauth(plugin, redirect_uri, state)
+            return Response({
+                'success': True,
+                'oauth_url': oauth_url,
+                'state': state
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def oauth_callback(self, request, pk=None):
+        """Handle OAuth callback"""
+        from integrations.plugins.plugin_service import PluginService
+
+        plugin = self.get_object()
+
+        # Verify state
+        state = request.data.get('state')
+        expected_state = request.session.get(f'oauth_state_{plugin.id}')
+
+        if state != expected_state:
+            return Response({
+                'success': False,
+                'message': 'Invalid state parameter'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        code = request.data.get('code')
+        redirect_uri = request.data.get('redirect_uri', request.build_absolute_uri('/api/plugins/oauth/callback/'))
+
+        if not code:
+            return Response({
+                'success': False,
+                'message': 'Authorization code is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        success, message = PluginService.complete_oauth(plugin, code, redirect_uri)
+
+        if success:
+            # Clean up session
+            request.session.pop(f'oauth_state_{plugin.id}', None)
+
+            return Response({
+                'success': True,
+                'message': message
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': message
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def verify(self, request, pk=None):
+        """Verify plugin connection"""
+        from integrations.plugins.plugin_service import PluginService
+
+        plugin = self.get_object()
+        success, message = PluginService.verify_connection(plugin)
+
+        if success:
+            return Response({
+                'success': True,
+                'message': message
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': message
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def sync(self, request, pk=None):
+        """Trigger data synchronization"""
+        from integrations.plugins.plugin_service import PluginService
+
+        plugin = self.get_object()
+        sync_type = request.data.get('sync_type')
+
+        if not sync_type:
+            return Response({
+                'success': False,
+                'message': 'sync_type is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Trigger async sync task or run sync directly
+            result = PluginService.sync_plugin_data(plugin, sync_type, **request.data)
+
+            if result.success:
+                return Response({
+                    'success': True,
+                    'message': 'Sync completed successfully',
+                    'records_fetched': result.records_fetched,
+                    'records_created': result.records_created,
+                    'records_updated': result.records_updated,
+                    'details': result.details
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'success': False,
+                    'message': result.error
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def account_info(self, request, pk=None):
+        """Get account information from platform"""
+        from integrations.plugins.plugin_service import PluginService
+
+        plugin = self.get_object()
+        account_info = PluginService.get_account_info(plugin)
+
+        return Response(account_info, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def refresh_token(self, request, pk=None):
+        """Manually refresh OAuth token"""
+        from integrations.plugins.plugin_service import PluginService
+
+        plugin = self.get_object()
+        success = PluginService.refresh_token_if_needed(plugin)
+
+        if success:
+            return Response({
+                'success': True,
+                'message': 'Token refreshed successfully'
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': 'Token refresh failed'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        """Toggle plugin active status"""
+        plugin = self.get_object()
+        plugin.is_active = not plugin.is_active
+        plugin.save(update_fields=['is_active'])
+
+        return Response({
+            'success': True,
+            'is_active': plugin.is_active
+        }, status=status.HTTP_200_OK)
+
+
+class PluginEventViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing plugin events"""
+    serializer_class = PluginEventSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import PluginEvent
+        # Filter by account through plugin relationship
+        return PluginEvent.objects.filter(plugin__account=self.request.user.account).select_related('plugin', 'lead', 'contact', 'deal')
+
+
+class PluginSyncLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing plugin sync logs"""
+    serializer_class = PluginSyncLogSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        from integrations.models import PluginSyncLog
+        # Filter by account through plugin relationship
+        return PluginSyncLog.objects.filter(plugin__account=self.request.user.account).select_related('plugin')
