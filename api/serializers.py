@@ -260,12 +260,28 @@ class PluginSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         from integrations.services.encryption import encrypt_value
+        from integrations.plugins.plugin_service import PluginService
 
-        # Encrypt credentials before saving
-        if 'client_id' in validated_data and validated_data['client_id']:
+        plugin_type = validated_data.get('plugin_type')
+
+        # Check if centralized credentials are available
+        use_centralized = PluginService.use_centralized_credentials(plugin_type)
+
+        # If using centralized credentials, client_id/secret are optional
+        if not use_centralized:
+            # Validate that user provided credentials
+            if not validated_data.get('client_id') or not validated_data.get('client_secret'):
+                from rest_framework import serializers as drf_serializers
+                raise drf_serializers.ValidationError({
+                    'client_id': 'Client ID is required when centralized credentials are not configured.',
+                    'client_secret': 'Client secret is required when centralized credentials are not configured.'
+                })
+
+        # Encrypt credentials before saving (only if provided)
+        if 'client_id' in validated_data and validated_data.get('client_id'):
             validated_data['client_id'] = encrypt_value(validated_data['client_id'])
 
-        if 'client_secret' in validated_data and validated_data['client_secret']:
+        if 'client_secret' in validated_data and validated_data.get('client_secret'):
             validated_data['client_secret'] = encrypt_value(validated_data['client_secret'])
 
         if 'access_token' in validated_data and validated_data.get('access_token'):
@@ -275,7 +291,6 @@ class PluginSerializer(serializers.ModelSerializer):
             validated_data['refresh_token'] = encrypt_value(validated_data['refresh_token'])
 
         # Set category based on plugin type
-        plugin_type = validated_data.get('plugin_type')
         if plugin_type in ['google_ads', 'meta_ads', 'tiktok_ads']:
             validated_data['category'] = 'advertising'
         elif plugin_type == 'shopify':
