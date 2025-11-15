@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     EmailTemplate, EmailCampaign, Email, EmailProvider,
-    Webhook, WebhookLog, ExternalIntegration
+    ExternalIntegration
 )
 
 
@@ -36,22 +36,6 @@ class EmailProviderAdmin(admin.ModelAdmin):
     search_fields = ['name', 'sender_email', 'account__name']
     ordering = ['priority', 'name']
     readonly_fields = ['created_at', 'updated_at', 'last_sent_at', 'sent_today', 'sent_this_month']
-
-
-@admin.register(Webhook)
-class WebhookAdmin(admin.ModelAdmin):
-    list_display = ['name', 'account', 'url', 'is_active', 'total_calls', 'failed_calls']
-    list_filter = ['is_active', 'created_at']
-    search_fields = ['name', 'url', 'account__name']
-    ordering = ['name']
-
-
-@admin.register(WebhookLog)
-class WebhookLogAdmin(admin.ModelAdmin):
-    list_display = ['webhook', 'event_type', 'status', 'response_code', 'created_at']
-    list_filter = ['status', 'event_type', 'created_at']
-    search_fields = ['webhook__name', 'event_type']
-    ordering = ['-created_at']
 
 
 @admin.register(ExternalIntegration)

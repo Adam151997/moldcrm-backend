@@ -552,23 +552,6 @@ class EmailCampaignViewSet(viewsets.ModelViewSet):
         )
 
 
-class WebhookViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing webhooks"""
-    from .serializers import WebhookSerializer
-    serializer_class = WebhookSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
-
-    def get_queryset(self):
-        from integrations.models import Webhook
-        return Webhook.objects.filter(account=self.request.user.account)
-
-    def perform_create(self, serializer):
-        serializer.save(
-            account=self.request.user.account,
-            created_by=self.request.user
-        )
-
-
 class ExternalIntegrationViewSet(viewsets.ModelViewSet):
     """ViewSet for managing external integrations"""
     from .serializers import ExternalIntegrationSerializer

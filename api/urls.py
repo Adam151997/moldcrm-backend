@@ -73,10 +73,6 @@ urlpatterns = [
     path('email-campaigns/', api_views.EmailCampaignViewSet.as_view({'get': 'list', 'post': 'create'}), name='email-campaigns-list'),
     path('email-campaigns/<int:pk>/', api_views.EmailCampaignViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='email-campaigns-detail'),
 
-    # Webhooks
-    path('webhooks/', api_views.WebhookViewSet.as_view({'get': 'list', 'post': 'create'}), name='webhooks-list'),
-    path('webhooks/<int:pk>/', api_views.WebhookViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='webhooks-detail'),
-
     # External Integrations
     path('integrations/', api_views.ExternalIntegrationViewSet.as_view({'get': 'list', 'post': 'create'}), name='integrations-list'),
     path('integrations/<int:pk>/', api_views.ExternalIntegrationViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='integrations-detail'),

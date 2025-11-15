@@ -5,7 +5,7 @@ from templates.models import BusinessTemplate, AppliedTemplate
 from automation.models import Workflow, WorkflowExecution, AIInsight
 from integrations.models import (
     EmailTemplate, EmailCampaign, Email, EmailProvider,
-    Webhook, WebhookLog, ExternalIntegration,
+    ExternalIntegration,
     Plugin, PluginEvent, PluginSyncLog,
     Segment, CampaignABTest, DripCampaign, DripCampaignStep, DripCampaignEnrollment,
     EmailEngagement, LinkClick, UnsubscribePreference, CampaignGoal
@@ -145,22 +145,6 @@ class EmailSerializer(serializers.ModelSerializer):
         model = Email
         fields = '__all__'
         read_only_fields = ['created_at', 'account', 'sent_at', 'delivered_at', 'opened_at', 'clicked_at']
-
-class WebhookSerializer(serializers.ModelSerializer):
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    
-    class Meta:
-        model = Webhook
-        fields = '__all__'
-        read_only_fields = ['created_by', 'created_at', 'updated_at', 'account', 'total_calls', 'failed_calls', 'last_called_at']
-
-class WebhookLogSerializer(serializers.ModelSerializer):
-    webhook_name = serializers.CharField(source='webhook.name', read_only=True)
-    
-    class Meta:
-        model = WebhookLog
-        fields = '__all__'
-        read_only_fields = ['created_at']
 
 class ExternalIntegrationSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
