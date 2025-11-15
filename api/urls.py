@@ -61,7 +61,11 @@ urlpatterns = [
     path('workflows/', api_views.WorkflowViewSet.as_view({'get': 'list', 'post': 'create'}), name='workflows-list'),
     path('workflows/<int:pk>/', api_views.WorkflowViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='workflows-detail'),
 
-    # AI Insights
+    # AI Agent (New - Replaces AI Insights)
+    path('ai-agent/query/', api_views.AIAgentViewSet.as_view({'post': 'query'}), name='ai-agent-query'),
+    path('ai-agent/suggestions/', api_views.AIAgentViewSet.as_view({'post': 'suggestions'}), name='ai-agent-suggestions'),
+
+    # AI Insights (DEPRECATED - Use AI Agent instead)
     path('ai-insights/', api_views.AIInsightViewSet.as_view({'get': 'list'}), name='ai-insights-list'),
     path('ai-insights/<int:pk>/', api_views.AIInsightViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'delete': 'destroy'}), name='ai-insights-detail'),
     path('ai-insights/generate-lead-score/', api_views.AIInsightViewSet.as_view({'post': 'generate_lead_score'}), name='ai-insights-lead-score'),
