@@ -4,8 +4,6 @@ Handles plugin lifecycle, adapter routing, and credential management
 """
 from typing import Optional, Type
 from django.core.exceptions import ValidationError
-from django.conf import settings
-import os
 
 from integrations.models import Plugin
 from integrations.services.encryption import encrypt_value, decrypt_value
@@ -38,74 +36,6 @@ class PluginService:
         'shopify': 'ecommerce',
     }
 
-    # Centralized OAuth credentials from environment variables
-    # If set, these will be used instead of user-provided credentials
-    CENTRALIZED_CREDENTIALS = {
-        'google_ads': {
-            'client_id': os.getenv('GOOGLE_ADS_CLIENT_ID'),
-            'client_secret': os.getenv('GOOGLE_ADS_CLIENT_SECRET'),
-        },
-        'meta_ads': {
-            'client_id': os.getenv('META_ADS_CLIENT_ID'),
-            'client_secret': os.getenv('META_ADS_CLIENT_SECRET'),
-        },
-        'tiktok_ads': {
-            'client_id': os.getenv('TIKTOK_ADS_CLIENT_ID'),
-            'client_secret': os.getenv('TIKTOK_ADS_CLIENT_SECRET'),
-        },
-        'shopify': {
-            'client_id': os.getenv('SHOPIFY_CLIENT_ID'),
-            'client_secret': os.getenv('SHOPIFY_CLIENT_SECRET'),
-        },
-    }
-
-    @classmethod
-    def use_centralized_credentials(cls, plugin_type: str) -> bool:
-        """
-        Check if centralized credentials are configured for this plugin type
-
-        Args:
-            plugin_type: Type of plugin
-
-        Returns:
-            True if centralized credentials exist
-        """
-        creds = cls.CENTRALIZED_CREDENTIALS.get(plugin_type, {})
-        return bool(creds.get('client_id') and creds.get('client_secret'))
-
-    @classmethod
-    def get_oauth_credentials(cls, plugin: Plugin) -> dict:
-        """
-        Get OAuth credentials - either centralized or user-provided
-
-        Args:
-            plugin: Plugin instance
-
-        Returns:
-            Dictionary with client_id and client_secret
-        """
-        # Check if centralized credentials are available
-        if cls.use_centralized_credentials(plugin.plugin_type):
-            creds = cls.CENTRALIZED_CREDENTIALS[plugin.plugin_type]
-            return {
-                'client_id': creds['client_id'],
-                'client_secret': creds['client_secret']
-            }
-
-        # Fall back to user-provided credentials
-        from integrations.services.encryption import decrypt_value
-
-        if not plugin.client_id or not plugin.client_secret:
-            raise ValueError(
-                f"No credentials configured for {plugin.get_plugin_type_display()}. "
-                "Either set environment variables or provide credentials."
-            )
-
-        return {
-            'client_id': decrypt_value(plugin.client_id),
-            'client_secret': decrypt_value(plugin.client_secret)
-        }
-
     @classmethod
     def get_adapter(cls, plugin: Plugin) -> BasePluginAdapter:
         """
@@ -128,17 +58,16 @@ class PluginService:
 
     @classmethod
     def create_plugin(cls, account, plugin_type: str, name: str,
-                     client_id: str = None, client_secret: str = None, config: dict = None) -> Plugin:
+                     client_id: str, client_secret: str, config: dict = None) -> Plugin:
         """
-        Create a new plugin with optional encrypted credentials
-        If centralized credentials exist, client_id/client_secret are optional
+        Create a new plugin with encrypted credentials
 
         Args:
             account: Account instance
             plugin_type: Type of plugin
             name: User-friendly name
-            client_id: OAuth client ID (optional if centralized credentials exist)
-            client_secret: OAuth client secret (optional if centralized credentials exist)
+            client_id: OAuth client ID
+            client_secret: OAuth client secret
             config: Platform-specific configuration
 
         Returns:
@@ -148,22 +77,12 @@ class PluginService:
         if plugin_type not in cls.ADAPTER_MAP:
             raise ValueError(f"Unsupported plugin type: {plugin_type}")
 
-        # Check if centralized credentials are available
-        use_centralized = cls.use_centralized_credentials(plugin_type)
-
-        # If not using centralized, require user credentials
-        if not use_centralized and (not client_id or not client_secret):
-            raise ValueError(
-                f"OAuth credentials required for {plugin_type}. "
-                "Please provide client_id and client_secret."
-            )
-
         # Get category
         category = cls.CATEGORY_MAP.get(plugin_type, 'other')
 
-        # Encrypt user-provided credentials only if provided
-        encrypted_client_id = encrypt_value(client_id) if client_id else ''
-        encrypted_client_secret = encrypt_value(client_secret) if client_secret else ''
+        # Encrypt credentials
+        encrypted_client_id = encrypt_value(client_id)
+        encrypted_client_secret = encrypt_value(client_secret)
 
         # Create plugin
         plugin = Plugin.objects.create(
