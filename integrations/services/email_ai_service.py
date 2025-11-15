@@ -63,7 +63,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -113,7 +116,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -162,7 +168,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             return response.text.strip()
         except Exception as e:
             return template  # Fallback to original template
@@ -219,7 +228,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -268,7 +280,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             if isinstance(result, list):
                 return result[:num_variants]
@@ -337,7 +352,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -389,7 +407,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -440,7 +461,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             return result
         except Exception as e:
@@ -490,7 +514,10 @@ class EmailAIService:
         """
 
         try:
-            response = self.ai.model.generate_content(prompt)
+            response = self.ai.client.models.generate_content(
+                model=self.ai.model_name,
+                contents=prompt
+            )
             result = self.ai._parse_json_response(response.text)
             return result
         except Exception as e:
