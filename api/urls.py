@@ -39,6 +39,22 @@ urlpatterns = [
     path('pipeline-stages/<int:pk>/', api_views.PipelineStageViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='pipeline-stages-detail'),
     path('pipeline-stages/reorder/', api_views.PipelineStageViewSet.as_view({'post': 'reorder'}), name='pipeline-stages-reorder'),
 
+    # Notes
+    path('notes/', api_views.NoteViewSet.as_view({'get': 'list', 'post': 'create'}), name='notes-list'),
+    path('notes/<int:pk>/', api_views.NoteViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='notes-detail'),
+
+    # Attachments
+    path('attachments/', api_views.AttachmentViewSet.as_view({'get': 'list', 'post': 'create'}), name='attachments-list'),
+    path('attachments/<int:pk>/', api_views.AttachmentViewSet.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='attachments-detail'),
+
+    # Tasks
+    path('tasks/', api_views.TaskViewSet.as_view({'get': 'list', 'post': 'create'}), name='tasks-list'),
+    path('tasks/<int:pk>/', api_views.TaskViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='tasks-detail'),
+
+    # Activity Logs
+    path('activity-logs/', api_views.ActivityLogViewSet.as_view({'get': 'list'}), name='activity-logs-list'),
+    path('activity-logs/<int:pk>/', api_views.ActivityLogViewSet.as_view({'get': 'retrieve'}), name='activity-logs-detail'),
+
     # Custom Fields
     path('custom-fields/', api_views.CustomFieldViewSet.as_view({'get': 'list', 'post': 'create'}), name='custom-fields-list'),
     path('custom-fields/<int:pk>/', api_views.CustomFieldViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='custom-fields-detail'),

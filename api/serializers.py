@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from crm.models import Lead, Contact, Deal, PipelineStage
+from crm.models import Lead, Contact, Deal, PipelineStage, Note, Attachment, Task, ActivityLog
 from custom_objects.models import CustomObject, CustomField, CustomObjectRecord
 from templates.models import BusinessTemplate, AppliedTemplate
 from automation.models import Workflow, WorkflowExecution, AIInsight
@@ -63,6 +63,72 @@ class PipelineStageSerializer(serializers.ModelSerializer):
         model = PipelineStage
         fields = ['id', 'name', 'display_name', 'color', 'is_closed', 'is_won', 'order', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+
+class NoteSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Note
+        fields = [
+            'id', 'content', 'lead', 'contact', 'deal',
+            'created_by', 'created_by_name', 'created_at', 'updated_at', 'attachments'
+        ]
+        read_only_fields = ['created_by', 'created_by_name', 'created_at', 'updated_at', 'account']
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attachment
+        fields = [
+            'id', 'file', 'file_url', 'filename', 'file_size', 'content_type',
+            'note', 'lead', 'contact', 'deal',
+            'uploaded_by', 'uploaded_by_name', 'created_at'
+        ]
+        read_only_fields = ['uploaded_by', 'uploaded_by_name', 'created_at', 'account']
+
+    def get_file_url(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
+
+class TaskSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    assigned_to_name = serializers.CharField(source='assigned_to.get_full_name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+
+    class Meta:
+        model = Task
+        fields = [
+            'id', 'title', 'description', 'status', 'status_display',
+            'priority', 'priority_display', 'due_date', 'completed_at',
+            'lead', 'contact', 'deal',
+            'assigned_to', 'assigned_to_name', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_by', 'created_by_name', 'created_at', 'updated_at', 'account']
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    performed_by_name = serializers.CharField(source='performed_by.get_full_name', read_only=True)
+    action_type_display = serializers.CharField(source='get_action_type_display', read_only=True)
+
+    class Meta:
+        model = ActivityLog
+        fields = [
+            'id', 'action_type', 'action_type_display', 'description', 'metadata',
+            'lead', 'contact', 'deal',
+            'performed_by', 'performed_by_name', 'created_at'
+        ]
+        read_only_fields = ['created_at', 'account']
 
 class CustomFieldSerializer(serializers.ModelSerializer):
     class Meta:
