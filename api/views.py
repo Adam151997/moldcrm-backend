@@ -2,13 +2,15 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Count, Sum, Q
 from django.db import transaction
-from crm.models import Lead, Contact, Deal, PipelineStage
+from crm.models import Lead, Contact, Deal, PipelineStage, Note, Attachment, Task, ActivityLog
 from custom_objects.models import CustomObject, CustomField, CustomObjectRecord
 from .serializers import (
     LeadSerializer, ContactSerializer, DealSerializer, UserSerializer,
-    PipelineStageSerializer, CustomFieldSerializer, CustomObjectSerializer,
+    PipelineStageSerializer, NoteSerializer, AttachmentSerializer, TaskSerializer,
+    ActivityLogSerializer, CustomFieldSerializer, CustomObjectSerializer,
     CustomObjectRecordSerializer, PluginSerializer, PluginEventSerializer,
     PluginSyncLogSerializer
 )
@@ -62,12 +64,27 @@ class ContactViewSet(viewsets.ModelViewSet):
             # Update lead status
             lead.status = 'converted'
             lead.save()
-            
+
+            # Log the conversion in ActivityLog
+            ActivityLog.objects.create(
+                account=request.user.account,
+                action_type='converted',
+                description=f"Converted lead {lead.first_name} {lead.last_name} to contact",
+                lead=lead,
+                contact=contact,
+                performed_by=request.user,
+                metadata={
+                    'lead_id': lead.id,
+                    'contact_id': contact.id,
+                    'email': contact.email
+                }
+            )
+
             serializer = ContactSerializer(contact)
             return Response(serializer.data)
         except Lead.DoesNotExist:
             return Response(
-                {"error": "Lead not found"}, 
+                {"error": "Lead not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -248,6 +265,183 @@ class PipelineStageViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+class NoteViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing notes on leads, contacts, and deals"""
+    serializer_class = NoteSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        queryset = Note.objects.filter(account=self.request.user.account)
+
+        # Filter by related object if provided
+        lead_id = self.request.query_params.get('lead', None)
+        contact_id = self.request.query_params.get('contact', None)
+        deal_id = self.request.query_params.get('deal', None)
+
+        if lead_id:
+            queryset = queryset.filter(lead_id=lead_id)
+        if contact_id:
+            queryset = queryset.filter(contact_id=contact_id)
+        if deal_id:
+            queryset = queryset.filter(deal_id=deal_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        note = serializer.save(created_by=self.request.user, account=self.request.user.account)
+
+        # Log activity
+        action_description = f"Added note: {note.content[:50]}..."
+        related_obj = note.lead or note.contact or note.deal
+
+        ActivityLog.objects.create(
+            account=self.request.user.account,
+            action_type='note_added',
+            description=action_description,
+            lead=note.lead,
+            contact=note.contact,
+            deal=note.deal,
+            performed_by=self.request.user,
+            metadata={'note_id': note.id}
+        )
+
+class AttachmentViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing file attachments"""
+    serializer_class = AttachmentSerializer
+    permission_classes = [permissions.IsAccountUser, IsAccountUser]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_queryset(self):
+        queryset = Attachment.objects.filter(account=self.request.user.account)
+
+        # Filter by related object if provided
+        note_id = self.request.query_params.get('note', None)
+        lead_id = self.request.query_params.get('lead', None)
+        contact_id = self.request.query_params.get('contact', None)
+        deal_id = self.request.query_params.get('deal', None)
+
+        if note_id:
+            queryset = queryset.filter(note_id=note_id)
+        if lead_id:
+            queryset = queryset.filter(lead_id=lead_id)
+        if contact_id:
+            queryset = queryset.filter(contact_id=contact_id)
+        if deal_id:
+            queryset = queryset.filter(deal_id=deal_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        file_obj = self.request.FILES.get('file')
+
+        attachment = serializer.save(
+            uploaded_by=self.request.user,
+            account=self.request.user.account,
+            filename=file_obj.name if file_obj else '',
+            file_size=file_obj.size if file_obj else 0,
+            content_type=file_obj.content_type if file_obj else ''
+        )
+
+        # Log activity
+        ActivityLog.objects.create(
+            account=self.request.user.account,
+            action_type='file_attached',
+            description=f"Attached file: {attachment.filename}",
+            lead=attachment.lead,
+            contact=attachment.contact,
+            deal=attachment.deal,
+            performed_by=self.request.user,
+            metadata={'attachment_id': attachment.id, 'filename': attachment.filename, 'file_size': attachment.file_size}
+        )
+
+class TaskViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing tasks/to-dos"""
+    serializer_class = TaskSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        queryset = Task.objects.filter(account=self.request.user.account)
+
+        # Filter by related object if provided
+        lead_id = self.request.query_params.get('lead', None)
+        contact_id = self.request.query_params.get('contact', None)
+        deal_id = self.request.query_params.get('deal', None)
+        assigned_to = self.request.query_params.get('assigned_to', None)
+        status_filter = self.request.query_params.get('status', None)
+
+        if lead_id:
+            queryset = queryset.filter(lead_id=lead_id)
+        if contact_id:
+            queryset = queryset.filter(contact_id=contact_id)
+        if deal_id:
+            queryset = queryset.filter(deal_id=deal_id)
+        if assigned_to:
+            queryset = queryset.filter(assigned_to_id=assigned_to)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        task = serializer.save(created_by=self.request.user, account=self.request.user.account)
+
+        # Log activity
+        ActivityLog.objects.create(
+            account=self.request.user.account,
+            action_type='task_created',
+            description=f"Created task: {task.title}",
+            lead=task.lead,
+            contact=task.contact,
+            deal=task.deal,
+            performed_by=self.request.user,
+            metadata={'task_id': task.id, 'priority': task.priority, 'due_date': str(task.due_date) if task.due_date else None}
+        )
+
+    def perform_update(self, serializer):
+        task = serializer.save()
+
+        # Log completion if status changed to completed
+        if task.status == 'completed' and not task.completed_at:
+            from django.utils import timezone
+            task.completed_at = timezone.now()
+            task.save()
+
+            ActivityLog.objects.create(
+                account=self.request.user.account,
+                action_type='task_completed',
+                description=f"Completed task: {task.title}",
+                lead=task.lead,
+                contact=task.contact,
+                deal=task.deal,
+                performed_by=self.request.user,
+                metadata={'task_id': task.id}
+            )
+
+class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet for viewing activity logs (read-only)"""
+    serializer_class = ActivityLogSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
+
+    def get_queryset(self):
+        queryset = ActivityLog.objects.filter(account=self.request.user.account)
+
+        # Filter by related object if provided
+        lead_id = self.request.query_params.get('lead', None)
+        contact_id = self.request.query_params.get('contact', None)
+        deal_id = self.request.query_params.get('deal', None)
+        action_type = self.request.query_params.get('action_type', None)
+
+        if lead_id:
+            queryset = queryset.filter(lead_id=lead_id)
+        if contact_id:
+            queryset = queryset.filter(contact_id=contact_id)
+        if deal_id:
+            queryset = queryset.filter(deal_id=deal_id)
+        if action_type:
+            queryset = queryset.filter(action_type=action_type)
+
+        return queryset
 
 class CustomFieldViewSet(viewsets.ModelViewSet):
     """ViewSet for managing custom fields"""
