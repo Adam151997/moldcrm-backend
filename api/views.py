@@ -309,7 +309,7 @@ class NoteViewSet(viewsets.ModelViewSet):
 class AttachmentViewSet(viewsets.ModelViewSet):
     """ViewSet for managing file attachments"""
     serializer_class = AttachmentSerializer
-    permission_classes = [permissions.IsAccountUser, IsAccountUser]
+    permission_classes = [permissions.IsAuthenticated, IsAccountUser]
     parser_classes = (MultiPartParser, FormParser)
 
     def get_queryset(self):
