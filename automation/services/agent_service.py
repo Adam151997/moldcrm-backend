@@ -221,10 +221,15 @@ Always maintain a professional, helpful tone.
             )
 
             # Create chat session with tools and system instruction
-            chat = self.client.chats.create(
-                model=self.model_name,
-                config=config
-            )
+            # Pass conversation history if provided to maintain context
+            chat_params = {
+                'model': self.model_name,
+                'config': config
+            }
+            if conversation_history:
+                chat_params['history'] = conversation_history
+
+            chat = self.client.chats.create(**chat_params)
 
             # Send the user's query
             response = chat.send_message(query)
